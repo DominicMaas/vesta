@@ -165,6 +165,7 @@ fn setup(
             },
             ..Default::default()
         })
+        .insert(ScreenSpaceAmbientOcclusionBundle::default())
         // .insert(EnvironmentMapLight {
         //     diffuse_map: assets.diffuse_map.clone(),
         //     specular_map: assets.specular_map.clone(),

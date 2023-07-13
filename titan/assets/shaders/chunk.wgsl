@@ -6,13 +6,17 @@
 
 #import bevy_pbr::mesh_functions as mesh_functions
 #import bevy_pbr::mesh_bindings             mesh
-#import bevy_pbr::mesh_view_bindings        view, fog
+#import bevy_pbr::mesh_view_bindings        view, fog, screen_space_ambient_occlusion_texture
 #import bevy_pbr::mesh_view_types           FOG_MODE_OFF
 
 #import bevy_pbr::pbr_functions as pbr_functions
 #import bevy_pbr::pbr_types as pbr_types
 
 #import bevy_pbr::prepass_utils
+
+#ifdef SCREEN_SPACE_AMBIENT_OCCLUSION
+#import bevy_pbr::gtao_utils gtao_multibounce
+#endif
 
 @group(1) @binding(0)
 var chunk_texture: texture_2d_array<f32>;
@@ -21,19 +25,10 @@ var chunk_texture: texture_2d_array<f32>;
 var chunk_sampler: sampler;
 
 struct Vertex {
-    // Position of the vertex
     @location(0) position: vec3<f32>,
-    
-    // Normals for lighting
     @location(1) normal: vec3<f32>,
-    
-    // UV coords for textures
     @location(2) uv: vec2<f32>,
-   
-    // Used to lookup our voxel index in the material array
     @location(3) voxel_index: u32,
-    
-    // Used to lookup what texture we should use for the face
     @location(4) texture_index: u32,
 };
 
@@ -78,7 +73,15 @@ fn vertex(vertex: Vertex) -> MeshVertexOutput {
 @fragment
 fn fragment(in: MeshVertexOutput, @builtin(front_facing) is_front: bool) -> @location(0) vec4<f32> {
     
+    // TODO: Create this material from block
+    var material = pbr_types::standard_material_new();
+    material.perceptual_roughness = 0.0;
+    material.reflectance = 0.0;
+    material.metallic = 0.0;
+    material.emissive = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+    
     var pbr_input: pbr_functions::PbrInput;
+    pbr_input.material = material;
     
     let is_orthographic = view.projection[3].w == 1.0;
         
@@ -86,6 +89,13 @@ fn fragment(in: MeshVertexOutput, @builtin(front_facing) is_front: bool) -> @loc
     pbr_input.material.base_color = texture;
     
     var occlusion: vec3<f32> = vec3(1.0);
+    
+#ifdef SCREEN_SPACE_AMBIENT_OCCLUSION
+    let ssao = textureLoad(screen_space_ambient_occlusion_texture, vec2<i32>(in.position.xy), 0i).r;
+    let ssao_multibounce = gtao_multibounce(ssao, pbr_input.material.base_color.rgb);
+    occlusion = min(occlusion, ssao_multibounce);
+#endif
+    
     pbr_input.occlusion = occlusion;
     
     pbr_input.frag_coord = in.position;
