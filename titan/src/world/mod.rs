@@ -32,10 +32,19 @@ impl Plugin for WorldPlugin {
             .insert_resource(ChunkLoadQueue {
                 0: VecDeque::with_capacity(10),
             })
-            .add_system(setup.in_schedule(OnEnter(AppState::InGame)))
-            .add_system(process_chunk_state_on_camera.in_set(OnUpdate(AppState::InGame)))
-            .add_system(prepare_chunk_load_tasks.in_set(OnUpdate(AppState::InGame)))
-            .add_system(apply_chunk_load_tasks.in_set(OnUpdate(AppState::InGame)));
+            .add_systems(OnEnter(AppState::InGame), setup)
+            .add_systems(
+                Update,
+                process_chunk_state_on_camera.run_if(in_state(AppState::InGame)),
+            )
+            .add_systems(
+                Update,
+                prepare_chunk_load_tasks.run_if(in_state(AppState::InGame)),
+            )
+            .add_systems(
+                Update,
+                apply_chunk_load_tasks.run_if(in_state(AppState::InGame)),
+            );
     }
 }
 

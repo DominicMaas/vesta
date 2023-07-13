@@ -1,9 +1,20 @@
+mod atlas;
 mod chunk;
 mod table;
 mod terrain;
-pub mod world;
+mod world;
 
-use bevy::{pbr::CascadeShadowConfigBuilder, prelude::*};
+use std::time::Duration;
+
+use bevy::{
+    asset::ChangeWatcher,
+    core_pipeline::{
+        experimental::taa::{TemporalAntiAliasBundle, TemporalAntiAliasPlugin},
+        Skybox,
+    },
+    pbr::{CascadeShadowConfigBuilder, ScreenSpaceAmbientOcclusionBundle},
+    prelude::*,
+};
 use bevy_asset_loader::prelude::*;
 use bevy_atmosphere::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
@@ -20,6 +31,15 @@ use world::WorldPlugin;
 #[derive(Component)]
 pub struct Player;
 
+#[derive(AssetCollection, Resource)]
+pub struct GeneralAssets {
+    #[asset(path = "environment/pisa_diffuse_rgb9e5_zstd.ktx2")]
+    pub diffuse_map: Handle<Image>,
+
+    #[asset(path = "environment/pisa_specular_rgb9e5_zstd.ktx2")]
+    pub specular_map: Handle<Image>,
+}
+
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 enum AppState {
     #[default]
@@ -31,7 +51,7 @@ fn main() {
     App::new()
         .add_state::<AppState>()
         .insert_resource(Msaa::Sample8)
-        .insert_resource(AtmosphereModel::default())
+        //.insert_resource(AtmosphereModel::default())
         .insert_resource(ClearColor(Color::rgb(0.5294, 0.8078, 0.9216)))
         .insert_resource(AmbientLight {
             color: Color::WHITE,
@@ -41,7 +61,7 @@ fn main() {
         .add_plugins(
             DefaultPlugins
                 .set(AssetPlugin {
-                    watch_for_changes: true,
+                    watch_for_changes: ChangeWatcher::with_delay(Duration::from_millis(200)),
                     ..Default::default()
                 })
                 .set(WindowPlugin {
@@ -53,24 +73,21 @@ fn main() {
                     ..Default::default()
                 }),
         )
-        .add_plugin(WorldPlugin)
-        .add_plugin(EguiPlugin)
-        .add_plugin(AtmospherePlugin)
-        .add_plugin(LookTransformPlugin)
-        .add_plugin(FpsCameraPlugin::default())
-        .add_plugin(WorldInspectorPlugin::new())
-        .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
-        .add_plugin(MaterialPlugin::<ChunkMaterial>::default())
+        .add_plugins(TemporalAntiAliasPlugin)
+        .add_plugins(WorldPlugin)
+        .add_plugins(EguiPlugin)
+        //.add_plugins(AtmospherePlugin)
+        .add_plugins(LookTransformPlugin)
+        .add_plugins(FpsCameraPlugin::default())
+        .add_plugins(WorldInspectorPlugin::new())
+        .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
+        .add_plugins(MaterialPlugin::<ChunkMaterial>::default())
         //.add_plugin(RapierDebugRenderPlugin::default())
         .add_loading_state(LoadingState::new(AppState::Loading).continue_to_state(AppState::InGame))
         .add_collection_to_loading_state::<_, TileAssets>(AppState::Loading)
-        .add_system(setup.in_schedule(OnEnter(AppState::InGame)))
-        .add_system(process_ui.in_set(OnUpdate(AppState::InGame)))
-        //.add_startup_system(setup)
-        // .add_startup_system(chunk_setup)
-        //.add_system(process_ui)
-        //.add_systems(OnEnter(AppState::InGame), setup)
-        // .add_systems(OnEnter(AppState::InGame), chunk_setup)
+        .add_collection_to_loading_state::<_, GeneralAssets>(AppState::Loading)
+        .add_systems(OnEnter(AppState::InGame), setup)
+        .add_systems(Update, process_ui.run_if(in_state(AppState::InGame)))
         .run();
 }
 
@@ -79,6 +96,7 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    assets: Res<GeneralAssets>,
 ) {
     // Sun
     let sun_val: f32 = 2.7;
@@ -140,7 +158,18 @@ fn setup(
 
     // Camera
     commands
-        .spawn(Camera3dBundle::default())
+        .spawn(Camera3dBundle {
+            camera: Camera {
+                hdr: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        // .insert(EnvironmentMapLight {
+        //     diffuse_map: assets.diffuse_map.clone(),
+        //     specular_map: assets.specular_map.clone(),
+        //})
+        //.insert(Skybox(assets.diffuse_map.clone()))
         .insert(FpsCameraBundle::new(
             FpsCameraController {
                 translate_sensitivity: 20.0,
@@ -162,6 +191,7 @@ fn setup(
             material: materials.add(StandardMaterial::from(Color::rgb(0.0, 0.0, 0.0))),
             ..Default::default()
         })
+        .insert(TemporalAntiAliasBundle::default())
         .insert(AtmosphereCamera::default())
         .insert(Player {});
 
@@ -172,14 +202,15 @@ fn setup(
     //.insert(AtmosphereCamera(None));
 }
 
-fn process_ui(mut contexts: EguiContexts, mut atmosphere: AtmosphereMut<Nishita>) {
+fn process_ui(mut contexts: EguiContexts) {
+    //, mut atmosphere: AtmosphereMut<Nishita>) {
     egui::Window::new("Voxel Demo").show(contexts.ctx_mut(), |ui| {
         ui.label("Created by Dominic Maas");
         ui.separator();
 
-        ui.label("Sun Position: ");
-        ui.add(egui::Slider::new(&mut atmosphere.sun_position.x, 0.0..=1.0));
-        ui.add(egui::Slider::new(&mut atmosphere.sun_position.y, 0.0..=1.0));
-        ui.add(egui::Slider::new(&mut atmosphere.sun_position.z, 0.0..=1.0));
+        //ui.label("Sun Position: ");
+        // ui.add(egui::Slider::new(&mut atmosphere.sun_position.x, 0.0..=1.0));
+        // ui.add(egui::Slider::new(&mut atmosphere.sun_position.y, 0.0..=1.0));
+        //ui.add(egui::Slider::new(&mut atmosphere.sun_position.z, 0.0..=1.0));
     });
 }

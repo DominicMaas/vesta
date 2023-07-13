@@ -1,6 +1,6 @@
 use bevy::{
     prelude::*,
-    reflect::TypeUuid,
+    reflect::{TypePath, TypeUuid},
     render::{
         mesh::MeshVertexAttribute,
         render_resource::{AsBindGroup, ShaderRef, VertexFormat},
@@ -14,7 +14,7 @@ pub const ATTRIBUTE_BASE_TEXTURE_INDEX: MeshVertexAttribute =
     MeshVertexAttribute::new("TextureIndex", 708080084, VertexFormat::Uint32);
 
 // A material that describes a chunk
-#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
+#[derive(AsBindGroup, TypeUuid, TypePath, Debug, Clone)]
 #[uuid = "e3442aaf-990b-4950-88ca-03d1990224fa"]
 pub struct ChunkMaterial {
     #[texture(0, dimension = "2d_array")]
@@ -41,8 +41,8 @@ impl Material for ChunkMaterial {
             Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
             Mesh::ATTRIBUTE_NORMAL.at_shader_location(1),
             Mesh::ATTRIBUTE_UV_0.at_shader_location(2),
-            ATTRIBUTE_BASE_VOXEL_INDEX.at_shader_location(7),
-            ATTRIBUTE_BASE_TEXTURE_INDEX.at_shader_location(8),
+            ATTRIBUTE_BASE_VOXEL_INDEX.at_shader_location(3),
+            ATTRIBUTE_BASE_TEXTURE_INDEX.at_shader_location(4),
         ])?;
         descriptor.vertex.buffers = vec![vertex_layout];
 

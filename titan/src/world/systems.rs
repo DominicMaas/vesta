@@ -1,4 +1,5 @@
 use crate::{
+    atlas::TileAtlasBuilder,
     chunk::{
         material::ChunkMaterial, mesher::ChunkMesher, tile_map::TileAssets, Chunk, ChunkBundle,
         ChunkId, CHUNK_XZ,
@@ -7,7 +8,6 @@ use crate::{
     Player,
 };
 use bevy::{prelude::*, render::texture::ImageSampler, tasks::AsyncComputeTaskPool};
-use bevy_tile_atlas::TileAtlasBuilder;
 use futures_lite::future;
 
 use super::{ChunkLoadQueue, ChunkLoadTask, RENDER_DISTANCE};
