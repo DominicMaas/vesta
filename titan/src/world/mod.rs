@@ -3,7 +3,8 @@ mod systems;
 use bevy::{tasks::Task, utils::HashMap};
 
 use self::systems::{
-    apply_chunk_load_tasks, prepare_chunk_load_tasks, process_chunk_state_on_camera, setup,
+    apply_chunk_load_tasks, chunk_gizmos, prepare_chunk_load_tasks, process_chunk_state_on_camera,
+    setup,
 };
 use crate::ChunkMaterial;
 use crate::{
@@ -44,7 +45,8 @@ impl Plugin for WorldPlugin {
             .add_systems(
                 Update,
                 apply_chunk_load_tasks.run_if(in_state(AppState::InGame)),
-            );
+            )
+            .add_systems(Update, chunk_gizmos);
     }
 }
 

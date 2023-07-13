@@ -2,12 +2,13 @@ use crate::{
     atlas::TileAtlasBuilder,
     chunk::{
         material::ChunkMaterial, mesher::ChunkMesher, tile_map::TileAssets, Chunk, ChunkBundle,
-        ChunkId, CHUNK_XZ,
+        ChunkId, CHUNK_XZ, CHUNK_Y,
     },
     terrain::Terrain,
     Player,
 };
 use bevy::{prelude::*, render::texture::ImageSampler, tasks::AsyncComputeTaskPool};
+use bevy_rapier3d::prelude::*;
 use futures_lite::future;
 
 use super::{ChunkLoadQueue, ChunkLoadTask, RENDER_DISTANCE};
@@ -111,11 +112,14 @@ pub fn apply_chunk_load_tasks(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut world: ResMut<crate::world::World>,
+
     mut tasks: Query<(Entity, &mut ChunkLoadTask)>,
 ) {
     for (entity, mut task) in &mut tasks {
         if let Some(chunk_data) = future::block_on(future::poll_once(&mut task.0)) {
+            // Add this mesh to our world
             let chunk_mesh_handle = meshes.add(chunk_data.2);
+            let collider_mesh = meshes.get(&chunk_mesh_handle.clone()).unwrap();
 
             // Ensure our world has the new chunk data
             world.chunks.insert(chunk_data.0, chunk_data.1);
@@ -131,49 +135,47 @@ pub fn apply_chunk_load_tasks(
                     ..Default::default()
                 })
                 .insert(chunk_mesh_handle)
+                .insert(RigidBody::Fixed)
                 .insert(Name::new(format!(
                     "Chunk: {}",
                     chunk_data.0.world_position()
-                )));
-
-            /*
-            let chunk_mesh_handle = meshes.add(m);
-                let chunk_mesh = &meshes.get(&chunk_mesh_handle);
-
-                commands
-                    .spawn(ChunkBundle {
-                        chunk_id: id,
-                        material: chunk_mat.clone(),
-                        transform: Transform::from_translation(world_position),
-                        ..Default::default()
-                    })
-                    .insert(chunk_mesh_handle)
-                    .insert(RigidBody::Fixed)
-                    .insert(Name::new(format!("Chunk: {}", world_position)))
-                    .insert(
-                        Collider::from_bevy_mesh(
-                            chunk_mesh.unwrap(),
-                            &ComputedColliderShape::TriMesh,
-                        )
+                )))
+                .insert(
+                    Collider::from_bevy_mesh(&collider_mesh, &ComputedColliderShape::TriMesh)
                         .unwrap(),
-                    );
-
-                // In the world!
-                chunk.state = ChunkState::Loaded;
-
-             */
+                );
         }
     }
+}
 
-    /*  query.for_each_mut(|(entity, mut gen_task)| {
-        if let Some(chunks) = future::block_on(future::poll_once(&mut gen_task.task)) {
-            for (key, data) in chunks.iter() {
-                voxels.map.insert(*key, *data);
+pub fn chunk_gizmos(mut gizmos: Gizmos, world: Res<crate::world::World>) {
+    for (chunk_id, _) in world.chunks.iter() {
+        let pos = chunk_id.world_position();
 
-                mesh_queue.queue.push(*key);
-            }
-            cmds.entity(entity).remove::<GenTask>();
-        }
-        return;
-    });*/
+        //gizmos.cuboid(
+        //     Transform::from_translation(chunk_id.world_position()).with_scale(Vec3::new(
+        //        CHUNK_XZ as f32,
+        //        CHUNK_Y as f32,
+        //       CHUNK_XZ as f32,
+        //   )),
+        //   Color::BLACK,
+        // );
+
+        gizmos.line(pos, pos + Vec3::new(0.0, CHUNK_Y as f32, 0.0), Color::BLACK);
+        gizmos.line(
+            pos + Vec3::new(CHUNK_XZ as f32, 0.0, 0.0),
+            pos + Vec3::new(CHUNK_XZ as f32, CHUNK_Y as f32, 0.0),
+            Color::BLACK,
+        );
+        gizmos.line(
+            pos + Vec3::new(0.0, 0.0, CHUNK_XZ as f32),
+            pos + Vec3::new(0.0, CHUNK_Y as f32, CHUNK_XZ as f32),
+            Color::BLACK,
+        );
+        gizmos.line(
+            pos + Vec3::new(CHUNK_XZ as f32, 0.0, CHUNK_XZ as f32),
+            pos + Vec3::new(CHUNK_XZ as f32, CHUNK_Y as f32, CHUNK_XZ as f32),
+            Color::BLACK,
+        );
+    }
 }

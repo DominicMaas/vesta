@@ -79,7 +79,8 @@ fn fragment(in: MeshVertexOutput, @builtin(front_facing) is_front: bool) -> @loc
     material.reflectance = 0.0;
     material.metallic = 0.0;
     material.emissive = vec4<f32>(0.0, 0.0, 0.0, 1.0);
-    
+    material.flags |= pbr_types::STANDARD_MATERIAL_FLAGS_FOG_ENABLED_BIT;
+     
     var pbr_input: pbr_functions::PbrInput;
     pbr_input.material = material;
     

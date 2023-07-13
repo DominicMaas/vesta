@@ -12,7 +12,7 @@ use bevy::{
         experimental::taa::{TemporalAntiAliasBundle, TemporalAntiAliasPlugin},
         Skybox,
     },
-    pbr::{CascadeShadowConfigBuilder, ScreenSpaceAmbientOcclusionBundle},
+    pbr::{CascadeShadowConfigBuilder, NotShadowCaster, ScreenSpaceAmbientOcclusionBundle},
     prelude::*,
 };
 use bevy_asset_loader::prelude::*;
@@ -92,39 +92,40 @@ fn main() {
 }
 
 fn setup(
-    //mut atmosphere: ResMut<Atmosphere>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    assets: Res<GeneralAssets>,
 ) {
     // Sun
-    let sun_val: f32 = 2.7;
-    let sun_pos = Vec3::new(0.0, sun_val.sin(), sun_val.cos());
-
-    //atmosphere.sun_position = sun_pos;
-
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
-            illuminance: 10000.0,
+            color: Color::rgb(0.98, 0.95, 0.82),
             shadows_enabled: true,
             ..Default::default()
         },
-        transform: Transform {
-            rotation: Quat::from_rotation_x(-sun_pos.y.atan2(sun_pos.z)),
-            ..default()
-        },
-        cascade_shadow_config: CascadeShadowConfigBuilder {
-            first_cascade_far_bound: 4.0,
-            num_cascades: 5,
-            ..Default::default()
-        }
-        .into(),
+        transform: Transform::from_xyz(0.0, 0.0, 0.0)
+            .looking_at(Vec3::new(-0.15, -0.05, 0.25), Vec3::Y),
         ..Default::default()
     });
 
-    /*commands
-        .spawn_bundle(PbrBundle {
+    // Sky
+    commands.spawn((
+        PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::Box::default())),
+            material: materials.add(StandardMaterial {
+                base_color: Color::hex("888888").unwrap(),
+                unlit: true,
+                cull_mode: None,
+                ..default()
+            }),
+            transform: Transform::from_scale(Vec3::splat(1000.0)),
+            ..default()
+        },
+        NotShadowCaster,
+    ));
+
+    commands
+        .spawn(PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
             material: materials.add(StandardMaterial::from(Color::rgb(0.8, 0.2, 0.2))),
             ..Default::default()
@@ -132,10 +133,10 @@ fn setup(
         .insert(RigidBody::Dynamic)
         .insert(Collider::cuboid(0.5, 0.5, 0.5))
         .insert(Restitution::coefficient(0.7))
-        .insert_bundle(TransformBundle::from(Transform::from_xyz(0.0, 32.0, 0.0)));
+        .insert(TransformBundle::from(Transform::from_xyz(0.0, 64.0, 0.0)));
 
     commands
-        .spawn_bundle(PbrBundle {
+        .spawn(PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
             material: materials.add(StandardMaterial::from(Color::rgb(0.2, 0.2, 0.8))),
             ..Default::default()
@@ -143,10 +144,10 @@ fn setup(
         .insert(RigidBody::Dynamic)
         .insert(Collider::cuboid(0.5, 0.5, 0.5))
         .insert(Restitution::coefficient(0.7))
-        .insert_bundle(TransformBundle::from(Transform::from_xyz(0.0, 34.0, 1.0)));
+        .insert(TransformBundle::from(Transform::from_xyz(0.0, 64.0, 1.0)));
 
     commands
-        .spawn_bundle(PbrBundle {
+        .spawn(PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Cube { size: 2.0 })),
             material: materials.add(StandardMaterial::from(Color::rgb(1.0, 1.0, 1.0))),
             ..Default::default()
@@ -154,26 +155,33 @@ fn setup(
         .insert(RigidBody::Dynamic)
         .insert(Collider::cuboid(1.0, 1.0, 1.0))
         .insert(Restitution::coefficient(0.7))
-        .insert_bundle(TransformBundle::from(Transform::from_xyz(1.0, 36.0, 0.0)));*/
+        .insert(TransformBundle::from(Transform::from_xyz(1.0, 64.0, 0.0)));
 
     // Camera
     commands
-        .spawn(Camera3dBundle {
-            camera: Camera {
-                hdr: true,
+        .spawn((
+            Camera3dBundle {
+                camera: Camera {
+                    hdr: true,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
-            ..Default::default()
-        })
+            FogSettings {
+                color: Color::rgba(0.2, 0.2, 0.2, 1.0),
+                directional_light_color: Color::rgba(1.0, 0.95, 0.75, 0.5),
+                directional_light_exponent: 5.0,
+                falloff: FogFalloff::from_visibility_colors(
+                    100.0, // distance in world units up to which objects retain visibility (>= 5% contrast)
+                    Color::rgb(0.35, 0.5, 0.33), // atmospheric extinction color (after light is lost due to absorption by atmospheric particles)
+                    Color::rgb(0.8, 0.8, 0.4), // atmospheric inscattering color (light gained due to scattering from the sun)
+                ),
+            },
+        ))
         .insert(ScreenSpaceAmbientOcclusionBundle::default())
-        // .insert(EnvironmentMapLight {
-        //     diffuse_map: assets.diffuse_map.clone(),
-        //     specular_map: assets.specular_map.clone(),
-        //})
-        //.insert(Skybox(assets.diffuse_map.clone()))
         .insert(FpsCameraBundle::new(
             FpsCameraController {
-                translate_sensitivity: 20.0,
+                translate_sensitivity: 40.0,
                 ..Default::default()
             },
             Vec3::new(0.0, 32.0, 5.0),
@@ -192,8 +200,8 @@ fn setup(
             material: materials.add(StandardMaterial::from(Color::rgb(0.0, 0.0, 0.0))),
             ..Default::default()
         })
-        .insert(TemporalAntiAliasBundle::default())
-        .insert(AtmosphereCamera::default())
+        //.insert(TemporalAntiAliasBundle::default())
+        //.insert(Collider::capsule_y(1.0, 1.0))
         .insert(Player {});
 
     //.insert(RigidBody::KinematicPositionBased)
