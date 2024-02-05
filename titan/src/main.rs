@@ -50,7 +50,6 @@ enum AppState {
 fn main() {
     App::new()
         .add_state::<AppState>()
-        .insert_resource(Msaa::Sample8)
         //.insert_resource(AtmosphereModel::default())
         .insert_resource(ClearColor(Color::rgb(0.5294, 0.8078, 0.9216)))
         .insert_resource(AmbientLight {
@@ -107,9 +106,8 @@ fn setup(
             .looking_at(Vec3::new(-0.15, -0.05, 0.25), Vec3::Y),
         ..Default::default()
     });
-
     // Sky
-    commands.spawn((
+    /*commands.spawn((
         PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Box::default())),
             material: materials.add(StandardMaterial {
@@ -122,7 +120,7 @@ fn setup(
             ..default()
         },
         NotShadowCaster,
-    ));
+    ))*/
 
     commands
         .spawn(PbrBundle {
@@ -160,6 +158,7 @@ fn setup(
     // Camera
     commands
         .spawn((
+            Player,
             Camera3dBundle {
                 camera: Camera {
                     hdr: true,
@@ -167,7 +166,7 @@ fn setup(
                 },
                 ..Default::default()
             },
-            FogSettings {
+            /*FogSettings {
                 color: Color::rgba(0.2, 0.2, 0.2, 1.0),
                 directional_light_color: Color::rgba(1.0, 0.95, 0.75, 0.5),
                 directional_light_exponent: 5.0,
@@ -176,7 +175,7 @@ fn setup(
                     Color::rgb(0.35, 0.5, 0.33), // atmospheric extinction color (after light is lost due to absorption by atmospheric particles)
                     Color::rgb(0.8, 0.8, 0.4), // atmospheric inscattering color (light gained due to scattering from the sun)
                 ),
-            },
+            },*/
         ))
         .insert(ScreenSpaceAmbientOcclusionBundle::default())
         .insert(FpsCameraBundle::new(
@@ -199,10 +198,9 @@ fn setup(
             })),
             material: materials.add(StandardMaterial::from(Color::rgb(0.0, 0.0, 0.0))),
             ..Default::default()
-        })
-        //.insert(TemporalAntiAliasBundle::default())
-        //.insert(Collider::capsule_y(1.0, 1.0))
-        .insert(Player {});
+        });
+    //.insert(TemporalAntiAliasBundle::default())
+    //.insert(Collider::capsule_y(1.0, 1.0))
 
     //.insert(RigidBody::KinematicPositionBased)
     //.insert(Collider::capsule_y(1.0, 1.0))

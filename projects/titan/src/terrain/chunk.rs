@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, asset::HandleId};
 
 use crate::{BlockType, CHUNK_HEIGHT, CHUNK_WIDTH};
 
@@ -31,9 +31,10 @@ pub struct ChunkBundle {
 
 impl ChunkBundle {
     pub fn new(mesh: Handle<Mesh>, chunk_material_id: HandleId) -> ChunkBundle {
-        materials.get(handle)
-        
+    
         ChunkBundle {
+            
+            material: materials.get(handle),
             mesh,
             transform: Transform::from_xyz(0.0, 10.0, 10.0),
         }
