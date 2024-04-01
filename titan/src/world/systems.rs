@@ -1,7 +1,7 @@
 use crate::{
     atlas::TileAtlasBuilder,
     chunk::{
-        material::ChunkMaterial, mesher::ChunkMesher, tile_map::TileAssets, Chunk, ChunkBundle,
+        material::ChunkMaterial, mesher::{ChunkMesher, CubeChunkMesher, MarchingChunkMesher}, tile_map::TileAssets, Chunk, ChunkBundle,
         ChunkId, CHUNK_XZ, CHUNK_Y,
     },
     terrain::Terrain,
@@ -91,14 +91,14 @@ pub fn prepare_chunk_load_tasks(
     let thread_pool = AsyncComputeTaskPool::get();
 
     let s = terrain_res.noise_func.get_seed();
-
+    
     while let Some(chunk_id) = queue.0.pop_front() {
         if let Some(_) = world.chunks.get_mut(&chunk_id) {
             let task = thread_pool.spawn(async move {
                 let terrain = Terrain::new(s);
 
                 let chunk = terrain.generate2(chunk_id.world_position());
-                let mesh = ChunkMesher::build(&chunk, chunk_id.world_position(), &terrain).unwrap();
+                let mesh = MarchingChunkMesher::build(&chunk, chunk_id.world_position(), &terrain).unwrap();
 
                 (chunk_id, chunk, mesh)
             });

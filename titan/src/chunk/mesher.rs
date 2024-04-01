@@ -5,8 +5,8 @@ use bevy::{
 
 use crate::{
     table::{
-        VoxelFace, FACE_BACK, FACE_BOTTOM, FACE_FRONT, FACE_LEFT, FACE_RIGHT, FACE_TOP, INDEX_MAP,
-        NORMAL_MAP, TEXTURE_MAP, VERTEX_MAP,
+        VoxelFace, CORNERS, EDGES, FACE_BACK, FACE_BOTTOM, FACE_FRONT, FACE_LEFT, FACE_RIGHT,
+        FACE_TOP, INDEX_MAP, NORMAL_MAP, TEXTURE_MAP, TRIANGLES, VERTEX_MAP,
     },
     terrain::Terrain,
 };
@@ -16,9 +16,14 @@ use super::{
     Chunk, VoxelType, CHUNK_XZ, CHUNK_Y,
 };
 
-pub struct ChunkMesher {}
+pub trait ChunkMesher {
+    fn build(chunk: &Chunk, world_position: Vec3, terrain: &Terrain) -> Option<Mesh>;
+}
 
-impl ChunkMesher {
+pub struct CubeChunkMesher {}
+pub struct MarchingChunkMesher {}
+
+impl CubeChunkMesher {
     fn build_face(
         chunk: &Chunk,
         face: VoxelFace,
@@ -64,8 +69,10 @@ impl ChunkMesher {
             *index = *index + 4;
         }
     }
+}
 
-    pub fn build(chunk: &Chunk, world_position: Vec3, terrain: &Terrain) -> Option<Mesh> {
+impl ChunkMesher for CubeChunkMesher {
+    fn build(chunk: &Chunk, world_position: Vec3, terrain: &Terrain) -> Option<Mesh> {
         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
 
         let mut vertices: Vec<[f32; 3]> = Vec::new();
@@ -109,6 +116,90 @@ impl ChunkMesher {
                     }
                 }
             }
+        }
+
+        let index_count = indices.len();
+
+        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+        mesh.insert_attribute(ATTRIBUTE_BASE_VOXEL_INDEX, voxel_indices);
+        mesh.insert_attribute(ATTRIBUTE_BASE_TEXTURE_INDEX, texture_indices);
+        mesh.set_indices(Some(Indices::U32(indices)));
+
+        if index_count > 0 {
+            return Some(mesh);
+        }
+
+        return None;
+    }
+}
+
+impl ChunkMesher for MarchingChunkMesher {
+    fn build(chunk: &Chunk, world_position: Vec3, terrain: &Terrain) -> Option<Mesh> {
+        let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+
+        let mut vertices: Vec<[f32; 3]> = Vec::new();
+        let mut normals: Vec<[f32; 3]> = Vec::new();
+        let mut uvs: Vec<[f32; 2]> = Vec::new();
+        let mut voxel_indices: Vec<u32> = Vec::new();
+        let mut texture_indices: Vec<u32> = Vec::new();
+
+        let mut indices: Vec<u32> = Vec::new();
+
+        let mut index = 0;
+
+        for x in 0..(CHUNK_XZ) {
+            for y in 0..(CHUNK_Y) {
+                for z in 0..(CHUNK_XZ) {
+                    let position = Vec3::new(x as f32, y as f32, z as f32);
+                    let voxel_type = chunk.get_t_block(world_position, position, terrain);
+
+                    // Calculate the cube index by looking at all 8 corners of the current
+                    // voxel
+                    let mut cube_index = 0;
+                    for i in 0..8 {
+                        if chunk.is_transparent(world_position, position + CORNERS[i], terrain) {
+                            cube_index |= 1 << i;
+                        }
+                    }
+
+                    // Look up the triangulation for this index
+                    let triangles = TRIANGLES[cube_index];
+                    for edge_index in triangles {
+                        if edge_index == -1 {
+                            break;
+                        }
+
+                        let index_a = EDGES[edge_index as usize][0];
+                        let index_b = EDGES[edge_index as usize][1];
+
+                        let v = position + ((CORNERS[index_a] + CORNERS[index_b]) / 2.0);
+
+                        vertices.push(v.into());
+                        // Normals are calculated in a separate pass
+                        uvs.push((0.0, 0.0).into());
+                        voxel_indices.push(voxel_type.index());
+                        texture_indices.push(VoxelType::Grass.texture_index(FACE_TOP));
+                        indices.push(index);
+
+                        index = index + 1;
+                    }
+                }
+            }
+        }
+
+        // Calculate normals for all vertices
+        for vertex in vertices.chunks(3) {
+            let v1 = Vec3::from(vertex[0]);
+            let v2 = Vec3::from(vertex[1]);
+            let v3 = Vec3::from(vertex[2]);
+
+            let normal = (v2 - v1).cross(v3 - v1).normalize();
+
+            normals.push(normal.to_array());
+            normals.push(normal.to_array());
+            normals.push(normal.to_array());
         }
 
         let index_count = indices.len();
