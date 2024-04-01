@@ -4,19 +4,11 @@ mod table;
 mod terrain;
 mod world;
 
-use std::time::Duration;
-
 use bevy::{
-    asset::ChangeWatcher,
-    core_pipeline::{
-        experimental::taa::{TemporalAntiAliasBundle, TemporalAntiAliasPlugin},
-        Skybox,
-    },
-    pbr::{CascadeShadowConfigBuilder, NotShadowCaster, ScreenSpaceAmbientOcclusionBundle},
-    prelude::*,
+    core_pipeline::experimental::taa::TemporalAntiAliasPlugin,
+    pbr::ScreenSpaceAmbientOcclusionBundle, prelude::*,
 };
 use bevy_asset_loader::prelude::*;
-use bevy_atmosphere::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
@@ -49,7 +41,7 @@ enum AppState {
 
 fn main() {
     App::new()
-        .add_state::<AppState>()
+        .init_state::<AppState>()
         //.insert_resource(AtmosphereModel::default())
         .insert_resource(ClearColor(Color::rgb(0.5294, 0.8078, 0.9216)))
         .insert_resource(AmbientLight {
@@ -60,16 +52,16 @@ fn main() {
         .add_plugins(
             DefaultPlugins
                 .set(AssetPlugin {
-                    watch_for_changes: ChangeWatcher::with_delay(Duration::from_millis(200)),
-                    ..Default::default()
+                    mode: AssetMode::Unprocessed,
+                    ..default()
                 })
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         title: "Voxel Game - Dominic Maas".to_string(),
                         resolution: (1920.0, 1080.0).into(),
-                        ..Default::default()
+                        ..default()
                     }),
-                    ..Default::default()
+                    ..default()
                 }),
         )
         .add_plugins(TemporalAntiAliasPlugin)
@@ -78,13 +70,16 @@ fn main() {
         //.add_plugins(AtmospherePlugin)
         .add_plugins(LookTransformPlugin)
         .add_plugins(FpsCameraPlugin::default())
-        .add_plugins(WorldInspectorPlugin::new())
+        //.add_plugins(WorldInspectorPlugin::new())
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugins(MaterialPlugin::<ChunkMaterial>::default())
         //.add_plugin(RapierDebugRenderPlugin::default())
-        .add_loading_state(LoadingState::new(AppState::Loading).continue_to_state(AppState::InGame))
-        .add_collection_to_loading_state::<_, TileAssets>(AppState::Loading)
-        .add_collection_to_loading_state::<_, GeneralAssets>(AppState::Loading)
+        .add_loading_state(
+            LoadingState::new(AppState::Loading)
+                .load_collection::<GeneralAssets>()
+                .load_collection::<TileAssets>()
+                .continue_to_state(AppState::InGame),
+        )
         .add_systems(OnEnter(AppState::InGame), setup)
         .add_systems(Update, process_ui.run_if(in_state(AppState::InGame)))
         .run();
@@ -100,11 +95,11 @@ fn setup(
         directional_light: DirectionalLight {
             color: Color::rgb(0.98, 0.95, 0.82),
             shadows_enabled: true,
-            ..Default::default()
+            ..default()
         },
         transform: Transform::from_xyz(0.0, 0.0, 0.0)
             .looking_at(Vec3::new(-0.15, -0.05, 0.25), Vec3::Y),
-        ..Default::default()
+        ..default()
     });
     // Sky
     /*commands.spawn((
@@ -124,9 +119,9 @@ fn setup(
 
     commands
         .spawn(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
+            mesh: meshes.add(Mesh::from(Cuboid::from_size((1.0, 1.0, 1.0).into()))),
             material: materials.add(StandardMaterial::from(Color::rgb(0.8, 0.2, 0.2))),
-            ..Default::default()
+            ..default()
         })
         .insert(RigidBody::Dynamic)
         .insert(Collider::cuboid(0.5, 0.5, 0.5))
@@ -135,9 +130,9 @@ fn setup(
 
     commands
         .spawn(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
+            mesh: meshes.add(Mesh::from(Cuboid::from_size((1.0, 1.0, 1.0).into()))),
             material: materials.add(StandardMaterial::from(Color::rgb(0.2, 0.2, 0.8))),
-            ..Default::default()
+            ..default()
         })
         .insert(RigidBody::Dynamic)
         .insert(Collider::cuboid(0.5, 0.5, 0.5))
@@ -146,9 +141,9 @@ fn setup(
 
     commands
         .spawn(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Cube { size: 2.0 })),
+            mesh: meshes.add(Mesh::from(Cuboid::from_size((2.0, 2.0, 2.0).into()))),
             material: materials.add(StandardMaterial::from(Color::rgb(1.0, 1.0, 1.0))),
-            ..Default::default()
+            ..default()
         })
         .insert(RigidBody::Dynamic)
         .insert(Collider::cuboid(1.0, 1.0, 1.0))
@@ -162,9 +157,9 @@ fn setup(
             Camera3dBundle {
                 camera: Camera {
                     hdr: true,
-                    ..Default::default()
+                    ..default()
                 },
-                ..Default::default()
+                ..default()
             },
             /*FogSettings {
                 color: Color::rgba(0.2, 0.2, 0.2, 1.0),
@@ -181,23 +176,16 @@ fn setup(
         .insert(FpsCameraBundle::new(
             FpsCameraController {
                 translate_sensitivity: 40.0,
-                ..Default::default()
+                ..default()
             },
             Vec3::new(0.0, 32.0, 5.0),
             Vec3::new(0., 32.0, 0.),
             Vec3::Y,
         ))
         .insert(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Capsule {
-                radius: 1.0,
-                rings: 0,
-                depth: 2.0,
-                latitudes: 16,
-                longitudes: 32,
-                uv_profile: shape::CapsuleUvProfile::Aspect,
-            })),
+            mesh: meshes.add(Mesh::from(Capsule3d::new(0.5, 0.5))),
             material: materials.add(StandardMaterial::from(Color::rgb(0.0, 0.0, 0.0))),
-            ..Default::default()
+            ..default()
         });
     //.insert(TemporalAntiAliasBundle::default())
     //.insert(Collider::capsule_y(1.0, 1.0))

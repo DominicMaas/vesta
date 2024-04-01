@@ -1,6 +1,6 @@
+use bevy::render::render_asset::RenderAssetUsages;
 use bevy::render::texture::TextureFormatPixelInfo;
 use bevy::{
-    asset::HandleId,
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
     sprite::TextureAtlasBuilderError,
@@ -18,7 +18,7 @@ pub trait TextureStore {
     /// Add a texture to the store
     fn add(&mut self, asset: Image) -> Handle<Image>;
     /// Get a texture from the store
-    fn get<H: Into<HandleId>>(&self, handle: H) -> Option<&Image>;
+    fn get<H: Into<Handle<Image>>>(&self, handle: H) -> Option<&Image>;
 }
 
 impl TextureStore for Assets<Image> {
@@ -26,8 +26,8 @@ impl TextureStore for Assets<Image> {
         self.add(asset)
     }
 
-    fn get<H: Into<HandleId>>(&self, handle: H) -> Option<&Image> {
-        self.get(&Handle::weak(handle.into()))
+    fn get<H: Into<Handle<Image>>>(&self, handle: H) -> Option<&Image> {
+        self.get(handle.into())
     }
 }
 
@@ -36,7 +36,7 @@ impl<'w, T: TextureStore + Resource> TextureStore for ResMut<'w, T> {
         self.deref_mut().add(asset)
     }
 
-    fn get<H: Into<HandleId>>(&self, handle: H) -> Option<&Image> {
+    fn get<H: Into<Handle<Image>>>(&self, handle: H) -> Option<&Image> {
         self.deref().get(handle)
     }
 }
@@ -226,7 +226,7 @@ impl TileAtlasBuilder {
     pub fn finish<TStore: TextureStore>(
         self,
         textures: &mut TStore,
-    ) -> Result<TextureAtlas, TileAtlasBuilderError> {
+    ) -> Result<(Handle<Image>, TextureAtlasLayout), TileAtlasBuilderError> {
         let total = self.handles.len();
         if total == 0usize {
             return Err(TileAtlasBuilderError::EmptyAtlas);
@@ -245,6 +245,7 @@ impl TileAtlasBuilder {
             TextureDimension::D2,
             &[0, 0, 0, 0],
             self.format,
+            RenderAssetUsages::default(),
         );
 
         let mut row_idx = 0usize;
@@ -252,7 +253,7 @@ impl TileAtlasBuilder {
         let mut texture_handles = HashMap::default();
         let mut texture_rects = Vec::with_capacity(total);
         for (index, handle) in self.handles.iter().enumerate() {
-            let texture = textures.get(handle).unwrap();
+            let texture = textures.get(handle.clone()).unwrap();
             let x = (col_idx as f32) * tile_size.x;
             let y = (row_idx as f32) * tile_size.y;
             let min = Vec2::new(x, y);
@@ -281,14 +282,16 @@ impl TileAtlasBuilder {
             }
         }
 
-        Ok(TextureAtlas::from_grid(
-            textures.add(atlas_texture),
+        let layout = TextureAtlasLayout::from_grid(
             *tile_size,
             self.get_max_columns(),
             total_rows,
             None,
             None,
-        ))
+        );
+
+        let image = textures.add(atlas_texture);
+        Ok((image, layout))
     }
 
     fn copy_converted_texture(

@@ -1,7 +1,7 @@
 use crate::{
     atlas::TileAtlasBuilder,
     chunk::{
-        material::ChunkMaterial, mesher::{ChunkMesher, CubeChunkMesher, MarchingChunkMesher}, tile_map::TileAssets, Chunk, ChunkBundle,
+        material::ChunkMaterial, mesher::{ChunkMesher, MarchingChunkMesher}, tile_map::TileAssets, Chunk, ChunkBundle,
         ChunkId, CHUNK_XZ, CHUNK_Y,
     },
     terrain::Terrain,
@@ -36,13 +36,14 @@ pub fn setup(
 
     // Reinterpret our image as a stacked 2d array, and use near sampling
     // (our textures are pixel art)
-    if let Some(atlas_image) = textures.get_mut(&atlas.texture) {
-        atlas_image.reinterpret_stacked_2d_as_array(atlas.len() as u32);
-        atlas_image.sampler_descriptor = ImageSampler::nearest();
+    if let Some(atlas_image) = textures.get_mut(&atlas.0) {
+        atlas_image.reinterpret_stacked_2d_as_array(atlas.1.len() as u32);
+        //atlas_image.sampler_descriptor = ImageSampler::nearest();
+        // TODO: Near Sampling
     }
 
     world.chunk_material = materials.add(ChunkMaterial {
-        texture: atlas.texture,
+        texture: atlas.0,
     });
 }
 

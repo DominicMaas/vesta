@@ -1,6 +1,6 @@
 use bevy::{
     prelude::*,
-    render::{mesh::Indices, render_resource::PrimitiveTopology},
+    render::{mesh::Indices, render_asset::RenderAssetUsages, render_resource::PrimitiveTopology},
 };
 
 use crate::{
@@ -73,7 +73,10 @@ impl CubeChunkMesher {
 
 impl ChunkMesher for CubeChunkMesher {
     fn build(chunk: &Chunk, world_position: Vec3, terrain: &Terrain) -> Option<Mesh> {
-        let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+        let mut mesh = Mesh::new(
+            PrimitiveTopology::TriangleList,
+            RenderAssetUsages::default(),
+        );
 
         let mut vertices: Vec<[f32; 3]> = Vec::new();
         let mut normals: Vec<[f32; 3]> = Vec::new();
@@ -125,7 +128,7 @@ impl ChunkMesher for CubeChunkMesher {
         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
         mesh.insert_attribute(ATTRIBUTE_BASE_VOXEL_INDEX, voxel_indices);
         mesh.insert_attribute(ATTRIBUTE_BASE_TEXTURE_INDEX, texture_indices);
-        mesh.set_indices(Some(Indices::U32(indices)));
+        mesh.insert_indices(Indices::U32(indices));
 
         if index_count > 0 {
             return Some(mesh);
@@ -137,7 +140,10 @@ impl ChunkMesher for CubeChunkMesher {
 
 impl ChunkMesher for MarchingChunkMesher {
     fn build(chunk: &Chunk, world_position: Vec3, terrain: &Terrain) -> Option<Mesh> {
-        let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+        let mut mesh = Mesh::new(
+            PrimitiveTopology::TriangleList,
+            RenderAssetUsages::default(),
+        );
 
         let mut vertices: Vec<[f32; 3]> = Vec::new();
         let mut normals: Vec<[f32; 3]> = Vec::new();
@@ -209,7 +215,7 @@ impl ChunkMesher for MarchingChunkMesher {
         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
         mesh.insert_attribute(ATTRIBUTE_BASE_VOXEL_INDEX, voxel_indices);
         mesh.insert_attribute(ATTRIBUTE_BASE_TEXTURE_INDEX, texture_indices);
-        mesh.set_indices(Some(Indices::U32(indices)));
+        mesh.insert_indices(Indices::U32(indices));
 
         if index_count > 0 {
             return Some(mesh);

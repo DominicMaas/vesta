@@ -1,6 +1,6 @@
 use bevy::{
     prelude::*,
-    reflect::{TypePath, TypeUuid},
+    reflect::TypePath,
     render::{
         mesh::MeshVertexAttribute,
         render_resource::{AsBindGroup, ShaderRef, VertexFormat},
@@ -14,8 +14,7 @@ pub const ATTRIBUTE_BASE_TEXTURE_INDEX: MeshVertexAttribute =
     MeshVertexAttribute::new("TextureIndex", 708080084, VertexFormat::Uint32);
 
 // A material that describes a chunk
-#[derive(AsBindGroup, TypeUuid, TypePath, Debug, Clone)]
-#[uuid = "e3442aaf-990b-4950-88ca-03d1990224fa"]
+#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 pub struct ChunkMaterial {
     #[texture(0, dimension = "2d_array")]
     #[sampler(1)]
