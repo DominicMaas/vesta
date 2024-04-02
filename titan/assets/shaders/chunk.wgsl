@@ -2,6 +2,24 @@
 // Vertex: mesh.wgsl
 // Fragment: mesh.wgsl
 
+#import bevy_pbr::{
+    view_transformations::position_world_to_clip,
+    pbr_functions::alpha_discard,
+}
+
+#ifdef PREPASS_PIPELINE
+#import bevy_pbr::{
+    prepass_io::{VertexOutput, FragmentOutput},
+    pbr_deferred_functions::deferred_output,
+}
+#else
+#import bevy_pbr::{
+    forward_io::{VertexOutput, FragmentOutput},
+    pbr_functions::{apply_pbr_lighting, main_pass_post_lighting_processing},
+    pbr_types::STANDARD_MATERIAL_FLAGS_UNLIT_BIT,
+}
+#endif
+
 #import bevy_core_pipeline::tonemapping     screen_space_dither, powsafe, tone_mapping
 
 #import bevy_pbr::mesh_functions as mesh_functions
@@ -18,13 +36,14 @@
 #import bevy_pbr::gtao_utils gtao_multibounce
 #endif
 
-@group(1) @binding(0)
+@group(2) @binding(0)
 var chunk_texture: texture_2d_array<f32>;
 
-@group(1) @binding(1)
+@group(2) @binding(1)
 var chunk_sampler: sampler;
 
 struct Vertex {
+    @builtin(instance_index) instance_index: u32,
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) uv: vec2<f32>,
@@ -56,11 +75,13 @@ struct MeshVertexOutput {
 @vertex
 fn vertex(vertex: Vertex) -> MeshVertexOutput {
     var out: MeshVertexOutput;
+    
+    var model = mesh_functions::get_model_matrix(vertex.instance_index);
 
-    out.world_normal = mesh_functions::mesh_normal_local_to_world(vertex.normal);
+    out.world_normal = mesh_functions::mesh_normal_local_to_world(vertex.normal, vertex.instance_index);
 
-    out.world_position = mesh_functions::mesh_position_local_to_world(mesh.model, vec4<f32>(vertex.position, 1.0));
-    out.position = mesh_functions::mesh_position_world_to_clip(out.world_position);
+    out.world_position = mesh_functions::mesh_position_local_to_world(model, vec4<f32>(vertex.position, 1.0));
+    out.position = position_world_to_clip(out.world_position.xyz);
 
     out.uv = vertex.uv;
 
@@ -71,23 +92,71 @@ fn vertex(vertex: Vertex) -> MeshVertexOutput {
 }
 
 @fragment
-fn fragment(in: MeshVertexOutput, @builtin(front_facing) is_front: bool) -> @location(0) vec4<f32> {
+fn fragment(in: MeshVertexOutput, @builtin(front_facing) is_front: bool) -> FragmentOutput {
+      
+    // Construct PBR input
+    var pbr_input: pbr_types::PbrInput;
     
     // TODO: Create this material from block
-    var material = pbr_types::standard_material_new();
-    material.perceptual_roughness = 0.0;
-    material.reflectance = 0.0;
-    material.metallic = 0.0;
-    material.emissive = vec4<f32>(0.0, 0.0, 0.0, 1.0);
-    material.flags |= pbr_types::STANDARD_MATERIAL_FLAGS_FOG_ENABLED_BIT;
-     
-    var pbr_input: pbr_functions::PbrInput;
-    pbr_input.material = material;
     
-    let is_orthographic = view.projection[3].w == 1.0;
-        
+    var double_sided = false;  
     let texture = textureSample(chunk_texture, chunk_sampler, in.uv, i32(in.texture_index)); 
     pbr_input.material.base_color = texture;
+    
+    //  diffuse_occlusion: vec3<f32>,
+    
+    pbr_input.frag_coord = in.position;
+    pbr_input.world_position = in.world_position;
+    pbr_input.is_orthographic = view.projection[3].w == 1.0;
+    
+    pbr_input.V = pbr_functions::calculate_view(in.world_position, pbr_input.is_orthographic);
+    
+#ifndef LOAD_PREPASS_NORMALS
+    pbr_input.N = pbr_functions::apply_normal_mapping(
+        pbr_input.material.flags,
+        pbr_input.world_normal,
+        double_sided,
+        is_front,
+        in.uv,
+        view.mip_bias,
+    );
+#endif
+    
+    // lightmap_light: vec3<f32>,
+    // flags: u32,
+    
+   // pbr_input.is_orthographic = view.projection[3].w == 1.0;
+   // pbr_input.V = pbr_functions::calculate_view(in.world_position, pbr_input.is_orthographic);
+   // 
+   // pbr_input.world_position = in.world_position;
+    
+    // alpha discard
+    pbr_input.material.base_color = alpha_discard(pbr_input.material, pbr_input.material.base_color);
+    
+#ifdef PREPASS_PIPELINE
+    // write the gbuffer, lighting pass id, and optionally normal and motion_vector textures
+    let out = deferred_output(in, pbr_input);
+#else
+    // in forward mode, we calculate the lit color immediately, and then apply some post-lighting effects here.
+    // in deferred mode the lit color and these effects will be calculated in the deferred lighting shader
+    var out: FragmentOutput;
+    if (pbr_input.material.flags & STANDARD_MATERIAL_FLAGS_UNLIT_BIT) == 0u {
+        out.color = apply_pbr_lighting(pbr_input);
+    } else {
+        out.color = pbr_input.material.base_color;
+    }
+
+    // apply in-shader post processing (fog, alpha-premultiply, and also tonemapping, debanding if the camera is non-hdr)
+    // note this does not include fullscreen postprocessing effects like bloom.
+    out.color = main_pass_post_lighting_processing(pbr_input, out.color);
+#endif
+
+    return out;
+}
+    
+    /*let is_orthographic = view.projection[3].w == 1.0;
+        
+   
     
     var occlusion: vec3<f32> = vec3(1.0);
     
@@ -147,4 +216,4 @@ fn fragment(in: MeshVertexOutput, @builtin(front_facing) is_front: bool) -> @loc
     output_color = pbr_functions::premultiply_alpha(pbr_input.material.flags, output_color);
 #endif
     return output_color;
-}
+}*/

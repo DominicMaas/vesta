@@ -3,8 +3,7 @@ mod systems;
 use bevy::{tasks::Task, utils::HashMap};
 
 use self::systems::{
-    apply_chunk_load_tasks, chunk_gizmos, prepare_chunk_load_tasks, process_chunk_state_on_camera,
-    setup,
+    apply_chunk_load_tasks, prepare_chunk_load_tasks, process_chunk_state_on_camera, setup,
 };
 use crate::ChunkMaterial;
 use crate::{
@@ -15,7 +14,7 @@ use bevy::prelude::*;
 use std::collections::VecDeque;
 
 /// How many chunks away from the player to render (horizontally)
-pub const RENDER_DISTANCE: usize = 18;
+pub const RENDER_DISTANCE: usize = 28;
 
 // A simple queue that keeps track of what chunks currently
 // need to be loaded into the world. This is done based on the id of the chunk
@@ -45,14 +44,14 @@ impl Plugin for WorldPlugin {
             .add_systems(
                 Update,
                 apply_chunk_load_tasks.run_if(in_state(AppState::InGame)),
-            )
-            .add_systems(Update, chunk_gizmos);
+            );
     }
 }
 
 /// Represents a world
 #[derive(Resource, Default)]
 pub struct World {
-    pub chunks: HashMap<ChunkId, Chunk>,
-    pub chunk_material: Handle<ChunkMaterial>,
+    pub chunks: HashMap<ChunkId, Option<Chunk>>,
+    //pub chunk_material: Handle<ChunkMaterial>,
+    pub chunk_material: Handle<StandardMaterial>,
 }

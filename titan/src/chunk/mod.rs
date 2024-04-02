@@ -85,22 +85,13 @@ pub struct Chunk {
 }
 
 // TODO: Replace with (ChunkId, MaterialMeshBundle<ChunkMaterial>)
-#[derive(Default, Bundle)]
+#[derive(Default, Bundle, Clone)]
 pub struct ChunkBundle {
     /// The id of this chunk, used to link up to the world
     pub chunk_id: ChunkId,
-    /// The chunk material (this is standard)
-    pub material: Handle<ChunkMaterial>,
-    /// Where the chunk is located in the world
-    pub transform: Transform,
-    /// Global world transform
-    pub global_transform: GlobalTransform,
-    /// User indication of whether an entity is visible
-    pub visibility: Visibility,
-    /// Inherited visibility of an entity.
-    pub inherited_visibility: InheritedVisibility,
-    /// Algorithmically-computed indication of whether an entity is visible and should be extracted for rendering
-    pub view_visibility: ViewVisibility,
+    
+    // 
+    pub mesh: MaterialMeshBundle<StandardMaterial>,
 }
 
 impl Default for Chunk {

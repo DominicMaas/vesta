@@ -1,8 +1,10 @@
 use crate::{
     atlas::TileAtlasBuilder,
     chunk::{
-        material::ChunkMaterial, mesher::{ChunkMesher, MarchingChunkMesher}, tile_map::TileAssets, Chunk, ChunkBundle,
-        ChunkId, CHUNK_XZ, CHUNK_Y,
+        material::ChunkMaterial,
+        mesher::{ChunkMesher, MarchingChunkMesher},
+        tile_map::TileAssets,
+        Chunk, ChunkBundle, ChunkId, CHUNK_XZ, CHUNK_Y,
     },
     terrain::Terrain,
     Player,
@@ -16,7 +18,7 @@ use super::{ChunkLoadQueue, ChunkLoadTask, RENDER_DISTANCE};
 /// Ensures that the chunk material is loaded
 pub fn setup(
     mut world: ResMut<crate::world::World>,
-    mut materials: ResMut<Assets<ChunkMaterial>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     mut textures: ResMut<Assets<Image>>,
     tile_assets: Res<TileAssets>,
 ) {
@@ -42,9 +44,7 @@ pub fn setup(
         // TODO: Near Sampling
     }
 
-    world.chunk_material = materials.add(ChunkMaterial {
-        texture: atlas.0,
-    });
+    world.chunk_material = materials.add(StandardMaterial { base_color: Color::hex("268B07").unwrap(), ..default() }); //materials.add(ChunkMaterial { texture: atlas.0 });
 }
 
 /// Starts the process of managing chunks based on the
@@ -75,7 +75,7 @@ pub fn process_chunk_state_on_camera(
             if !world.chunks.contains_key(&chunk_id) {
                 // Insert an empty chunk into the world. This is just to allocate the position in the map
                 // we will fill it with voxel data later
-                world.chunks.insert(chunk_id, Chunk::empty());
+                world.chunks.insert(chunk_id, None);
 
                 queue.0.push_back(chunk_id);
             }
@@ -92,14 +92,15 @@ pub fn prepare_chunk_load_tasks(
     let thread_pool = AsyncComputeTaskPool::get();
 
     let s = terrain_res.noise_func.get_seed();
-    
+
     while let Some(chunk_id) = queue.0.pop_front() {
         if let Some(_) = world.chunks.get_mut(&chunk_id) {
             let task = thread_pool.spawn(async move {
                 let terrain = Terrain::new(s);
-
+      
                 let chunk = terrain.generate2(chunk_id.world_position());
-                let mesh = MarchingChunkMesher::build(&chunk, chunk_id.world_position(), &terrain).unwrap();
+                let mesh = MarchingChunkMesher::build(&chunk, chunk_id.world_position(), &terrain)
+                    .unwrap();
 
                 (chunk_id, chunk, mesh)
             });
@@ -123,7 +124,7 @@ pub fn apply_chunk_load_tasks(
             let collider_mesh = meshes.get(&chunk_mesh_handle.clone()).unwrap();
 
             // Ensure our world has the new chunk data
-            world.chunks.insert(chunk_data.0, chunk_data.1);
+            world.chunks.insert(chunk_data.0, Some(chunk_data.1));
 
             // Replace the chunk load task with our bundle
             commands
@@ -131,9 +132,11 @@ pub fn apply_chunk_load_tasks(
                 .remove::<ChunkLoadTask>()
                 .insert(ChunkBundle {
                     chunk_id: chunk_data.0,
-                    material: world.chunk_material.clone(),
-                    transform: Transform::from_translation(chunk_data.0.world_position()),
-                    ..Default::default()
+                    mesh: MaterialMeshBundle {
+                        material: world.chunk_material.clone(),
+                        transform: Transform::from_translation(chunk_data.0.world_position()),
+                        ..default()
+                    },
                 })
                 .insert(chunk_mesh_handle)
                 .insert(RigidBody::Fixed)
@@ -146,37 +149,5 @@ pub fn apply_chunk_load_tasks(
                         .unwrap(),
                 );
         }
-    }
-}
-
-pub fn chunk_gizmos(mut gizmos: Gizmos, world: Res<crate::world::World>) {
-    for (chunk_id, _) in world.chunks.iter() {
-        let pos = chunk_id.world_position();
-
-        //gizmos.cuboid(
-        //     Transform::from_translation(chunk_id.world_position()).with_scale(Vec3::new(
-        //        CHUNK_XZ as f32,
-        //        CHUNK_Y as f32,
-        //       CHUNK_XZ as f32,
-        //   )),
-        //   Color::BLACK,
-        // );
-
-        gizmos.line(pos, pos + Vec3::new(0.0, CHUNK_Y as f32, 0.0), Color::BLACK);
-        gizmos.line(
-            pos + Vec3::new(CHUNK_XZ as f32, 0.0, 0.0),
-            pos + Vec3::new(CHUNK_XZ as f32, CHUNK_Y as f32, 0.0),
-            Color::BLACK,
-        );
-        gizmos.line(
-            pos + Vec3::new(0.0, 0.0, CHUNK_XZ as f32),
-            pos + Vec3::new(0.0, CHUNK_Y as f32, CHUNK_XZ as f32),
-            Color::BLACK,
-        );
-        gizmos.line(
-            pos + Vec3::new(CHUNK_XZ as f32, 0.0, CHUNK_XZ as f32),
-            pos + Vec3::new(CHUNK_XZ as f32, CHUNK_Y as f32, CHUNK_XZ as f32),
-            Color::BLACK,
-        );
     }
 }

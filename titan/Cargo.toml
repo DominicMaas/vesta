@@ -16,6 +16,7 @@ bracket-noise = "0.8.7"
 rand = "0.8.5"
 futures-lite = "1.13.0"
 thiserror = "1.0.58"
+iyes_perf_ui = "0.2.3"
 
 # Enable only a small amount of optimization in debug mode
 [profile.dev]

@@ -5,14 +5,22 @@ mod terrain;
 mod world;
 
 use bevy::{
-    core_pipeline::experimental::taa::TemporalAntiAliasPlugin,
-    pbr::ScreenSpaceAmbientOcclusionBundle, prelude::*,
+    core_pipeline::{bloom::BloomSettings, experimental::taa::TemporalAntiAliasPlugin},
+    pbr::{light_consts::lux, ScreenSpaceAmbientOcclusionBundle},
+    prelude::*,
 };
 use bevy_asset_loader::prelude::*;
+use bevy_atmosphere::{
+    collection::nishita::Nishita,
+    model::AtmosphereModel,
+    plugin::{AtmosphereCamera, AtmospherePlugin},
+    system_param::AtmosphereMut,
+};
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
 use chunk::{material::ChunkMaterial, tile_map::TileAssets};
+use iyes_perf_ui::{PerfUiCompleteBundle, PerfUiPlugin};
 use smooth_bevy_cameras::{
     controllers::fps::{FpsCameraBundle, FpsCameraController, FpsCameraPlugin},
     LookTransformPlugin,
@@ -22,6 +30,14 @@ use world::WorldPlugin;
 
 #[derive(Component)]
 pub struct Player;
+
+// Marker for updating the position of the light, not needed unless we have multiple lights
+#[derive(Component)]
+struct Sun;
+
+// Timer for updating the daylight cycle (updating the atmosphere every frame is slow, so it's better to do incremental changes)
+#[derive(Resource)]
+struct CycleTimer(Timer);
 
 #[derive(AssetCollection, Resource)]
 pub struct GeneralAssets {
@@ -42,13 +58,20 @@ enum AppState {
 fn main() {
     App::new()
         .init_state::<AppState>()
-        //.insert_resource(AtmosphereModel::default())
-        .insert_resource(ClearColor(Color::rgb(0.5294, 0.8078, 0.9216)))
+        .insert_resource(Msaa::Sample4)
+        .insert_resource(AtmosphereModel::default())
         .insert_resource(AmbientLight {
             color: Color::WHITE,
-            brightness: 0.15,
+            brightness: 130.,
         })
         .insert_resource(Terrain::new(rand::random::<u64>()))
+        .insert_resource(CycleTimer(Timer::new(
+            bevy::utils::Duration::from_millis(50),
+            TimerMode::Repeating,
+        )))
+        .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin)
+        .add_plugins(bevy::diagnostic::EntityCountDiagnosticsPlugin)
+        .add_plugins(bevy::diagnostic::SystemInformationDiagnosticsPlugin)
         .add_plugins(
             DefaultPlugins
                 .set(AssetPlugin {
@@ -67,13 +90,14 @@ fn main() {
         .add_plugins(TemporalAntiAliasPlugin)
         .add_plugins(WorldPlugin)
         .add_plugins(EguiPlugin)
-        //.add_plugins(AtmospherePlugin)
+        .add_plugins(PerfUiPlugin)
+        .add_plugins(AtmospherePlugin)
         .add_plugins(LookTransformPlugin)
         .add_plugins(FpsCameraPlugin::default())
         //.add_plugins(WorldInspectorPlugin::new())
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugins(MaterialPlugin::<ChunkMaterial>::default())
-        //.add_plugin(RapierDebugRenderPlugin::default())
+        //.add_plugins(RapierDebugRenderPlugin::default())
         .add_loading_state(
             LoadingState::new(AppState::Loading)
                 .load_collection::<GeneralAssets>()
@@ -82,6 +106,7 @@ fn main() {
         )
         .add_systems(OnEnter(AppState::InGame), setup)
         .add_systems(Update, process_ui.run_if(in_state(AppState::InGame)))
+        .add_systems(Update, daylight_cycle.run_if(in_state(AppState::InGame)))
         .run();
 }
 
@@ -91,16 +116,18 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     // Sun
-    commands.spawn(DirectionalLightBundle {
-        directional_light: DirectionalLight {
-            color: Color::rgb(0.98, 0.95, 0.82),
-            shadows_enabled: true,
+    commands.spawn((
+        DirectionalLightBundle {
+            directional_light: DirectionalLight {
+                shadows_enabled: true,
+                illuminance: lux::AMBIENT_DAYLIGHT,
+                ..default()
+            },
+
             ..default()
         },
-        transform: Transform::from_xyz(0.0, 0.0, 0.0)
-            .looking_at(Vec3::new(-0.15, -0.05, 0.25), Vec3::Y),
-        ..default()
-    });
+        Sun,
+    ));
     // Sky
     /*commands.spawn((
         PbrBundle {
@@ -161,21 +188,23 @@ fn setup(
                 },
                 ..default()
             },
-            /*FogSettings {
+            BloomSettings::NATURAL,
+            AtmosphereCamera::default(),
+            FogSettings {
                 color: Color::rgba(0.2, 0.2, 0.2, 1.0),
                 directional_light_color: Color::rgba(1.0, 0.95, 0.75, 0.5),
-                directional_light_exponent: 5.0,
+                directional_light_exponent: 6.0,
                 falloff: FogFalloff::from_visibility_colors(
-                    100.0, // distance in world units up to which objects retain visibility (>= 5% contrast)
+                    600.0, // distance in world units up to which objects retain visibility (>= 5% contrast)
                     Color::rgb(0.35, 0.5, 0.33), // atmospheric extinction color (after light is lost due to absorption by atmospheric particles)
                     Color::rgb(0.8, 0.8, 0.4), // atmospheric inscattering color (light gained due to scattering from the sun)
                 ),
-            },*/
+            },
         ))
         .insert(ScreenSpaceAmbientOcclusionBundle::default())
         .insert(FpsCameraBundle::new(
             FpsCameraController {
-                translate_sensitivity: 40.0,
+                translate_sensitivity: 50.0,
                 ..default()
             },
             Vec3::new(0.0, 32.0, 5.0),
@@ -183,12 +212,14 @@ fn setup(
             Vec3::Y,
         ))
         .insert(PbrBundle {
-            mesh: meshes.add(Mesh::from(Capsule3d::new(0.5, 0.5))),
+            mesh: meshes.add(Mesh::from(Capsule3d::new(0.5, 1.0))),
             material: materials.add(StandardMaterial::from(Color::rgb(0.0, 0.0, 0.0))),
             ..default()
-        });
-    //.insert(TemporalAntiAliasBundle::default())
-    //.insert(Collider::capsule_y(1.0, 1.0))
+        })
+        .insert(Collider::capsule_y(0.5, 0.5));
+
+    commands.spawn(PerfUiCompleteBundle::default());
+    //
 
     //.insert(RigidBody::KinematicPositionBased)
     //.insert(Collider::capsule_y(1.0, 1.0))
@@ -197,15 +228,36 @@ fn setup(
     //.insert(AtmosphereCamera(None));
 }
 
-fn process_ui(mut contexts: EguiContexts) {
-    //, mut atmosphere: AtmosphereMut<Nishita>) {
+fn process_ui(mut contexts: EguiContexts, mut atmosphere: AtmosphereMut<Nishita>) {
     egui::Window::new("Voxel Demo").show(contexts.ctx_mut(), |ui| {
         ui.label("Created by Dominic Maas");
         ui.separator();
 
-        //ui.label("Sun Position: ");
-        // ui.add(egui::Slider::new(&mut atmosphere.sun_position.x, 0.0..=1.0));
-        // ui.add(egui::Slider::new(&mut atmosphere.sun_position.y, 0.0..=1.0));
-        //ui.add(egui::Slider::new(&mut atmosphere.sun_position.z, 0.0..=1.0));
+        ui.label("Sun Position: ");
+        ui.add(egui::Slider::new(&mut atmosphere.sun_position.x, 0.0..=1.0));
+        ui.add(egui::Slider::new(&mut atmosphere.sun_position.y, 0.0..=1.0));
+        ui.add(egui::Slider::new(&mut atmosphere.sun_position.z, 0.0..=1.0));
     });
+}
+
+// We can edit the Atmosphere resource and it will be updated automatically
+fn daylight_cycle(
+    mut atmosphere: AtmosphereMut<Nishita>,
+    mut query: Query<(&mut Transform, &mut DirectionalLight), With<Sun>>,
+    mut timer: ResMut<CycleTimer>,
+    time: Res<Time>,
+) {
+    timer.0.tick(time.delta());
+
+    if timer.0.finished() {
+        let start_offset = 0.15;
+
+        let t = start_offset + (time.elapsed_seconds_wrapped() / 2000.0);
+        atmosphere.sun_position = Vec3::new(0., t.sin(), t.cos());
+
+        if let Some((mut light_trans, mut directional)) = query.single_mut().into() {
+            light_trans.rotation = Quat::from_rotation_x(-t);
+            directional.illuminance = t.sin().max(0.0).powf(2.0) * lux::AMBIENT_DAYLIGHT;
+        }
+    }
 }

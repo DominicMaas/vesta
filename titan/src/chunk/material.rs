@@ -1,10 +1,8 @@
 use bevy::{
-    prelude::*,
-    reflect::TypePath,
-    render::{
+    pbr::{PBR_PREPASS_SHADER_HANDLE, PBR_SHADER_HANDLE}, prelude::*, reflect::TypePath, render::{
         mesh::MeshVertexAttribute,
         render_resource::{AsBindGroup, ShaderRef, VertexFormat},
-    },
+    }
 };
 
 pub const ATTRIBUTE_BASE_VOXEL_INDEX: MeshVertexAttribute =
@@ -27,7 +25,8 @@ impl Material for ChunkMaterial {
     }
 
     fn fragment_shader() -> ShaderRef {
-        "shaders/chunk.wgsl".into()
+        PBR_SHADER_HANDLE.into()
+        //"shaders/chunk.wgsl".into()
     }
 
     fn prepass_vertex_shader() -> ShaderRef {
@@ -35,9 +34,14 @@ impl Material for ChunkMaterial {
     }
 
     fn prepass_fragment_shader() -> ShaderRef {
-        "shaders/chunk_prepass.wgsl".into()
+        PBR_PREPASS_SHADER_HANDLE.into()
+        //"shaders/chunk_prepass.wgsl".into()
     }
 
+    fn deferred_fragment_shader() -> ShaderRef {
+        PBR_SHADER_HANDLE.into()
+    }
+    
     fn specialize(
         _pipeline: &bevy::pbr::MaterialPipeline<Self>,
         descriptor: &mut bevy::render::render_resource::RenderPipelineDescriptor,
