@@ -9,12 +9,19 @@ use crate::{
     terrain::Terrain,
 };
 use bevy::prelude::*;
+use fast_surface_nets::ndshape::{ConstShape, ConstShape3usize};
 
 use self::material::ChunkMaterial;
 
 #[derive(Component, Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ChunkId {
     pos: IVec2,
+}
+
+impl std::fmt::Display for ChunkId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}, {}]", self.pos.x, self.pos.y)
+    }
 }
 
 impl ChunkId {
@@ -27,6 +34,15 @@ impl ChunkId {
     pub fn world_position(&self) -> Vec3 {
         Vec3::new(self.pos.x as f32, 0.0, self.pos.y as f32)
     }
+
+    pub fn world_position_to_local(&self, position: Vec3) -> [usize; 3] {
+        let local_position = position - self.world_position();
+        let x = f32::abs(local_position.x) as usize;
+        let y = f32::abs(local_position.y) as usize;
+        let z = f32::abs(local_position.z) as usize;
+
+        [x, y, z]
+    }
 }
 
 // Chunk constants
@@ -34,6 +50,8 @@ impl ChunkId {
 pub const CHUNK_XZ: usize = 16;
 pub const CHUNK_Y: usize = 64;
 pub const CHUNK_SZ: usize = CHUNK_XZ * CHUNK_XZ * CHUNK_Y;
+
+pub type ChunkShape = ConstShape3usize<CHUNK_XZ, CHUNK_Y, CHUNK_XZ>;
 
 pub const WORLD_XZ: isize = 18;
 pub const WORLD_Y: isize = 1;
@@ -45,35 +63,34 @@ pub const WORLD_HEIGHT: usize = WORLD_Y as usize * CHUNK_Y;
 pub enum VoxelType {
     #[default]
     Air,
-    Dirt,
-    Grass,
-    Leaf,
-    Log,
-    Stone,
-    Sand,
-    Glass,
-    Brick,
-    Water,
+    Dirt(f32),
+    Grass(f32),
+    Stone(f32),
 }
 
 impl VoxelType {
     /// Get the texture index of rhis voxel type
     pub fn texture_index(&self, face: VoxelFace) -> u32 {
         match self {
-            VoxelType::Dirt => 0,
-            VoxelType::Grass => match face {
+            VoxelType::Dirt(_) => 0,
+            VoxelType::Grass(_) => match face {
                 FACE_TOP => 1,
                 FACE_BOTTOM => 0,
                 _ => 2,
             },
-            VoxelType::Stone => 3,
+            VoxelType::Stone(_) => 3,
             _ => 0,
         }
     }
 
     /// Get the numerical index of this voxel type
     pub fn index(&self) -> u32 {
-        *self as u32
+        match self {
+            VoxelType::Air => 0,
+            VoxelType::Dirt(_) => 1,
+            VoxelType::Grass(_) => 2,
+            VoxelType::Stone(_) => 3,
+        }
     }
 }
 
@@ -82,16 +99,6 @@ impl VoxelType {
 pub struct Chunk {
     /// 1D Array of all blocks in this chunk
     pub blocks: Vec<VoxelType>,
-}
-
-// TODO: Replace with (ChunkId, MaterialMeshBundle<ChunkMaterial>)
-#[derive(Default, Bundle, Clone)]
-pub struct ChunkBundle {
-    /// The id of this chunk, used to link up to the world
-    pub chunk_id: ChunkId,
-    
-    // 
-    pub mesh: MaterialMeshBundle<StandardMaterial>,
 }
 
 impl Default for Chunk {
@@ -103,8 +110,8 @@ impl Default for Chunk {
 impl Chunk {
     /// Create a new chunk with the correct internal voxel size (all air)
     pub fn new() -> Self {
-        let mut blocks = Vec::with_capacity(CHUNK_SZ);
-        blocks.resize(CHUNK_SZ, VoxelType::Air);
+        let mut blocks = Vec::with_capacity(ChunkShape::SIZE);
+        blocks.resize(ChunkShape::SIZE, VoxelType::Air);
         Self { blocks }
     }
 
@@ -115,12 +122,17 @@ impl Chunk {
 
     /// Set the block type at the provided position
     pub fn set_block(&mut self, x: usize, y: usize, z: usize, voxel_type: VoxelType) {
-        self.blocks[(z * CHUNK_XZ * CHUNK_Y + y * CHUNK_XZ + x) as usize] = voxel_type;
+        self.blocks[ChunkShape::linearize([x, y, z])] = voxel_type;
     }
 
     /// Get the block type at the provided position
     pub fn get_block(&self, x: usize, y: usize, z: usize) -> VoxelType {
-        self.blocks[(z * CHUNK_XZ * CHUNK_Y + y * CHUNK_XZ + x) as usize]
+        // If outside this chunk
+        if (x < 0) || (y < 0) || (z < 0) || (x >= CHUNK_XZ) || (y >= CHUNK_Y) || (z >= CHUNK_XZ) {
+            return VoxelType::Air;
+        }
+
+        self.blocks[ChunkShape::linearize([x, y, z])]
     }
 
     /// Get the block type at the provided position
@@ -137,14 +149,26 @@ impl Chunk {
         }
 
         // If inside the chunk
-        self.blocks[(position.z as usize * CHUNK_XZ * CHUNK_Y
-            + position.y as usize * CHUNK_XZ
-            + position.x as usize) as usize]
+        self.get_block(
+            position.x as usize,
+            position.y as usize,
+            position.z as usize,
+        )
     }
 
     /// Returns if the specified block is transparent (air, water, etc.)
     /// Used for block culling
-    fn is_transparent(&self, world_position: Vec3, position: Vec3, terrain: &Terrain) -> bool {
+    pub fn is_transparent(&self, world_position: Vec3, position: Vec3, terrain: &Terrain) -> bool {
         self.get_t_block(world_position, position, terrain) == VoxelType::Air
     }
+}
+
+// TODO: Replace with (ChunkId, MaterialMeshBundle<ChunkMaterial>)
+#[derive(Default, Bundle, Clone)]
+pub struct ChunkBundle {
+    /// The id of this chunk, used to link up to the world
+    pub chunk_id: ChunkId,
+
+    //
+    pub mesh: MaterialMeshBundle<StandardMaterial>,
 }

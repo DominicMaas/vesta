@@ -1,11 +1,15 @@
 mod atlas;
 mod chunk;
+mod player;
 mod table;
 mod terrain;
 mod world;
 
 use bevy::{
-    core_pipeline::{bloom::BloomSettings, experimental::taa::TemporalAntiAliasPlugin},
+    core_pipeline::{
+        bloom::BloomSettings,
+        experimental::taa::{TemporalAntiAliasBundle, TemporalAntiAliasPlugin},
+    },
     pbr::{light_consts::lux, ScreenSpaceAmbientOcclusionBundle},
     prelude::*,
 };
@@ -21,6 +25,7 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
 use chunk::{material::ChunkMaterial, tile_map::TileAssets};
 use iyes_perf_ui::{PerfUiCompleteBundle, PerfUiPlugin};
+use player::PlayerPlugin;
 use smooth_bevy_cameras::{
     controllers::fps::{FpsCameraBundle, FpsCameraController, FpsCameraPlugin},
     LookTransformPlugin,
@@ -46,6 +51,9 @@ pub struct GeneralAssets {
 
     #[asset(path = "environment/pisa_specular_rgb9e5_zstd.ktx2")]
     pub specular_map: Handle<Image>,
+    
+    #[asset(path = "fonts/BerkeleyMono-Regular.ttf")]
+    pub ui_font: Handle<Font>,
 }
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
@@ -87,6 +95,7 @@ fn main() {
                     ..default()
                 }),
         )
+        .add_plugins(PlayerPlugin)
         .add_plugins(TemporalAntiAliasPlugin)
         .add_plugins(WorldPlugin)
         .add_plugins(EguiPlugin)
@@ -105,7 +114,6 @@ fn main() {
                 .continue_to_state(AppState::InGame),
         )
         .add_systems(OnEnter(AppState::InGame), setup)
-        .add_systems(Update, process_ui.run_if(in_state(AppState::InGame)))
         .add_systems(Update, daylight_cycle.run_if(in_state(AppState::InGame)))
         .run();
 }
@@ -202,6 +210,7 @@ fn setup(
             },
         ))
         .insert(ScreenSpaceAmbientOcclusionBundle::default())
+        .insert(TemporalAntiAliasBundle::default())
         .insert(FpsCameraBundle::new(
             FpsCameraController {
                 translate_sensitivity: 50.0,
@@ -228,18 +237,6 @@ fn setup(
     //.insert(AtmosphereCamera(None));
 }
 
-fn process_ui(mut contexts: EguiContexts, mut atmosphere: AtmosphereMut<Nishita>) {
-    egui::Window::new("Voxel Demo").show(contexts.ctx_mut(), |ui| {
-        ui.label("Created by Dominic Maas");
-        ui.separator();
-
-        ui.label("Sun Position: ");
-        ui.add(egui::Slider::new(&mut atmosphere.sun_position.x, 0.0..=1.0));
-        ui.add(egui::Slider::new(&mut atmosphere.sun_position.y, 0.0..=1.0));
-        ui.add(egui::Slider::new(&mut atmosphere.sun_position.z, 0.0..=1.0));
-    });
-}
-
 // We can edit the Atmosphere resource and it will be updated automatically
 fn daylight_cycle(
     mut atmosphere: AtmosphereMut<Nishita>,
@@ -250,7 +247,7 @@ fn daylight_cycle(
     timer.0.tick(time.delta());
 
     if timer.0.finished() {
-        let start_offset = 0.15;
+        let start_offset = 0.45;
 
         let t = start_offset + (time.elapsed_seconds_wrapped() / 2000.0);
         atmosphere.sun_position = Vec3::new(0., t.sin(), t.cos());

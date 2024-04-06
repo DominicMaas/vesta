@@ -2,7 +2,7 @@ use crate::{
     atlas::TileAtlasBuilder,
     chunk::{
         material::ChunkMaterial,
-        mesher::{ChunkMesher, MarchingChunkMesher},
+        mesher::{ChunkMesher, CubeChunkMesher, MarchingChunkMesher, SurfaceNetsChunkMesher},
         tile_map::TileAssets,
         Chunk, ChunkBundle, ChunkId, CHUNK_XZ, CHUNK_Y,
     },
@@ -44,7 +44,10 @@ pub fn setup(
         // TODO: Near Sampling
     }
 
-    world.chunk_material = materials.add(StandardMaterial { base_color: Color::hex("268B07").unwrap(), ..default() }); //materials.add(ChunkMaterial { texture: atlas.0 });
+    world.chunk_material = materials.add(StandardMaterial {
+        base_color: Color::hex("268B07").unwrap(),
+        ..default()
+    }); //materials.add(ChunkMaterial { texture: atlas.0 });
 }
 
 /// Starts the process of managing chunks based on the
@@ -58,13 +61,16 @@ pub fn process_chunk_state_on_camera(
 
     let render_distance = (RENDER_DISTANCE * CHUNK_XZ) as isize;
 
-    let chunk_x = ((transform.translation.x / CHUNK_XZ as f32).floor() as isize
-        * CHUNK_XZ as isize)
-        - CHUNK_XZ as isize;
+    let chunk_x = ((transform.translation.x / CHUNK_XZ as f32).floor() * CHUNK_XZ as f32) as isize;
+    let chunk_z = ((transform.translation.z / CHUNK_XZ as f32).floor() * CHUNK_XZ as f32) as isize;
 
-    let chunk_z = ((transform.translation.z / CHUNK_XZ as f32).floor() as isize
-        * CHUNK_XZ as isize)
-        - CHUNK_XZ as isize;
+    // let mut chunk_x = ((transform.translation.x / CHUNK_XZ as f32).floor() as isize
+    //     * CHUNK_XZ as isize)
+    //     - (CHUNK_XZ as isize * 2);
+
+    //let mut chunk_z = ((transform.translation.z / CHUNK_XZ as f32).floor() as isize
+    //    * CHUNK_XZ as isize)
+    //   - (CHUNK_XZ as isize * 2);
 
     for x in (chunk_x - render_distance..chunk_x + render_distance).step_by(CHUNK_XZ) {
         for z in (chunk_z - render_distance..chunk_z + render_distance).step_by(CHUNK_XZ) {
@@ -97,7 +103,7 @@ pub fn prepare_chunk_load_tasks(
         if let Some(_) = world.chunks.get_mut(&chunk_id) {
             let task = thread_pool.spawn(async move {
                 let terrain = Terrain::new(s);
-      
+
                 let chunk = terrain.generate2(chunk_id.world_position());
                 let mesh = MarchingChunkMesher::build(&chunk, chunk_id.world_position(), &terrain)
                     .unwrap();
@@ -149,5 +155,37 @@ pub fn apply_chunk_load_tasks(
                         .unwrap(),
                 );
         }
+    }
+}
+
+pub fn chunk_gizmos(mut gizmos: Gizmos, world: Res<crate::world::World>) {
+    for (chunk_id, _) in world.chunks.iter() {
+        let pos = chunk_id.world_position();
+
+        //gizmos.cuboid(
+        //     Transform::from_translation(chunk_id.world_position()).with_scale(Vec3::new(
+        //        CHUNK_XZ as f32,
+        //        CHUNK_Y as f32,
+        //       CHUNK_XZ as f32,
+        //   )),
+        //   Color::BLACK,
+        // );
+
+        gizmos.line(pos, pos + Vec3::new(0.0, CHUNK_Y as f32, 0.0), Color::RED);
+        gizmos.line(
+            pos + Vec3::new(CHUNK_XZ as f32, 0.0, 0.0),
+            pos + Vec3::new(CHUNK_XZ as f32, CHUNK_Y as f32, 0.0),
+            Color::RED,
+        );
+        gizmos.line(
+            pos + Vec3::new(0.0, 0.0, CHUNK_XZ as f32),
+            pos + Vec3::new(0.0, CHUNK_Y as f32, CHUNK_XZ as f32),
+            Color::RED,
+        );
+        gizmos.line(
+            pos + Vec3::new(CHUNK_XZ as f32, 0.0, CHUNK_XZ as f32),
+            pos + Vec3::new(CHUNK_XZ as f32, CHUNK_Y as f32, CHUNK_XZ as f32),
+            Color::RED,
+        );
     }
 }
