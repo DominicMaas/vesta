@@ -10,7 +10,7 @@ use bevy::{
         bloom::BloomSettings,
         experimental::taa::{TemporalAntiAliasBundle, TemporalAntiAliasPlugin},
     },
-    pbr::{light_consts::lux, ScreenSpaceAmbientOcclusionBundle},
+    pbr::{light_consts::lux, wireframe::WireframePlugin, ScreenSpaceAmbientOcclusionBundle},
     prelude::*, window::PresentMode,
 };
 use bevy_asset_loader::prelude::*;
@@ -96,6 +96,7 @@ fn main() {
                     ..default()
                 }),
         )
+        .add_plugins(WireframePlugin)
         .add_plugins(PlayerPlugin)
         .add_plugins(TemporalAntiAliasPlugin)
         .add_plugins(WorldPlugin)

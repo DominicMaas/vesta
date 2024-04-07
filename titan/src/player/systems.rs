@@ -1,10 +1,6 @@
-use bevy::{math::bounding::RayCast3d, prelude::*, render::primitives::Aabb};
+use bevy::{math::bounding::RayCast3d, prelude::*};
 
-use crate::{
-    chunk::{ChunkBundle, ChunkId, VoxelType, CHUNK_XZ},
-    terrain::Terrain,
-    GeneralAssets, Player,
-};
+use crate::{chunk::VoxelType, GeneralAssets, Player};
 
 #[derive(Component)]
 pub struct DebugMenu;
@@ -12,8 +8,6 @@ pub struct DebugMenu;
 pub fn setup(
     mut commands: Commands,
     assets: Res<GeneralAssets>,
-    terrain_res: Res<Terrain>,
-    mut images: ResMut<Assets<Image>>,
     mut config_store: ResMut<GizmoConfigStore>,
 ) {
     // Set depth for gizmos
@@ -47,33 +41,10 @@ pub fn setup(
             }),
         )
         .insert(DebugMenu);
-
-    commands
-        .spawn(NodeBundle {
-            style: Style {
-                position_type: PositionType::Absolute,
-                bottom: Val::Px(12.0),
-                left: Val::Px(12.0),
-                width: Val::Px(256.0),
-                height: Val::Px(256.0),
-                ..default()
-            },
-            ..default()
-        })
-        .with_children(|parent| {
-            parent.spawn(ImageBundle {
-                image: UiImage::new(images.add(terrain_res.generate_image())),
-                ..default()
-            });
-        });
 }
-
-// TODO: I'm dumb, we actually want to tranvserse the data structure containing the chunk data (as
-// this is what the meshes are based on)
 
 pub fn draw_cursor(
     camera_query: Query<(&Camera, &GlobalTransform), With<Player>>,
-    chunks_query: Query<(&Aabb, &ChunkId), With<ChunkId>>,
     windows: Query<&Window>,
     world: Res<crate::world::World>,
 
@@ -102,7 +73,7 @@ pub fn draw_cursor(
 
     // Calculate a ray pointing from the camera into the world from the center of the screen
     if let Some(ray) = camera.viewport_to_world(camera_transform, (w / 2., h / 2.).into()) {
-        let ray_cast = RayCast3d::from_ray(ray, 200.0);
+        let _ray_cast = RayCast3d::from_ray(ray, 200.0);
 
         //  for (hit_box, id) in chunks_query.iter()  {
 

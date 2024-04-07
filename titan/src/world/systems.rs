@@ -1,57 +1,21 @@
 use crate::{
-    atlas::TileAtlasBuilder,
     chunk::{
         material::ChunkMaterial,
-        mesher::{ChunkMesher, CubeChunkMesher, MarchingChunkMesher},
-        tile_map::TileAssets,
-        Chunk, ChunkBundle, ChunkId, CHUNK_XZ, CHUNK_Y,
+        mesher::{ChunkMesher, MarchingChunkMesher},
+        ChunkBundle, ChunkId, CHUNK_XZ, CHUNK_Y,
     },
     terrain::Terrain,
     Player,
 };
-use bevy::{prelude::*, render::texture::ImageSampler, tasks::AsyncComputeTaskPool};
+use bevy::{pbr::wireframe::Wireframe, prelude::*, tasks::AsyncComputeTaskPool};
 use bevy_rapier3d::prelude::*;
 use futures_lite::future;
 
 use super::{ChunkLoadQueue, ChunkLoadTask, RENDER_DISTANCE};
 
 /// Ensures that the chunk material is loaded
-pub fn setup(
-    mut world: ResMut<crate::world::World>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut textures: ResMut<Assets<Image>>,
-    tile_assets: Res<TileAssets>,
-) {
-    let mut builder = TileAtlasBuilder::new(Vec2::new(16.0, 16.0));
-
-    // Add our textures
-    for handle in tile_assets.tiles.iter() {
-        let texture = textures.get(handle).unwrap();
-        builder.add_texture(handle.clone(), texture).unwrap();
-    }
-
-    // Vertically stacked
-    builder.max_columns(Some(1));
-
-    // Build our atlas
-    let atlas = builder.finish(&mut textures).unwrap();
-
-    // Reinterpret our image as a stacked 2d array, and use near sampling
-    // (our textures are pixel art)
-    if let Some(atlas_image) = textures.get_mut(&atlas.0) {
-        atlas_image.reinterpret_stacked_2d_as_array(atlas.1.len() as u32);
-        //atlas_image.sampler_descriptor = ImageSampler::nearest();
-        // TODO: Near Sampling
-    }
-
-    world.chunk_material = materials.add(StandardMaterial {
-        base_color: Color::hex("268B07").unwrap(),
-        perceptual_roughness: 0.8,
-        metallic: 0.0,
-        reflectance: 0.4,
-        fog_enabled: true,
-        ..default()
-    }); //materials.add(ChunkMaterial { texture: atlas.0 });
+pub fn setup(mut world: ResMut<crate::world::World>, mut materials: ResMut<Assets<ChunkMaterial>>) {
+    world.chunk_material = materials.add(ChunkMaterial {});
 }
 
 /// Starts the process of managing chunks based on the
@@ -67,14 +31,6 @@ pub fn process_chunk_state_on_camera(
 
     let chunk_x = ((transform.translation.x / CHUNK_XZ as f32).floor() * CHUNK_XZ as f32) as isize;
     let chunk_z = ((transform.translation.z / CHUNK_XZ as f32).floor() * CHUNK_XZ as f32) as isize;
-
-    // let mut chunk_x = ((transform.translation.x / CHUNK_XZ as f32).floor() as isize
-    //     * CHUNK_XZ as isize)
-    //     - (CHUNK_XZ as isize * 2);
-
-    //let mut chunk_z = ((transform.translation.z / CHUNK_XZ as f32).floor() as isize
-    //    * CHUNK_XZ as isize)
-    //   - (CHUNK_XZ as isize * 2);
 
     for x in (chunk_x - render_distance..chunk_x + render_distance).step_by(CHUNK_XZ) {
         for z in (chunk_z - render_distance..chunk_z + render_distance).step_by(CHUNK_XZ) {

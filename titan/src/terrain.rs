@@ -27,54 +27,6 @@ impl Terrain {
         Self { noise_func }
     }
 
-    pub fn generate_image(&self) -> Image {
-        let mut data = Vec::new();
-
-        for cx in -64..64 {
-            for cz in -64..64 {
-                let mut value = 0.0;
-
-                // Determine the highest point
-                for cy in 0..CHUNK_Y {
-                    let y_value = self
-                        .get_block_type(Vec3::new(cx as f32, cy as f32, cz as f32))
-                        .density_as_float();
-
-                    if y_value <= 0.0 {
-                        value = (cy as f32) + y_value;
-                        break;
-                    }
-                }
-
-                let u8v = Self::map_range(
-                    (0.0, CHUNK_Y as f32),
-                    (u8::MIN as f32, u8::MAX as f32),
-                    value,
-                ) as u8;
-
-                // Turn this range into a color (rgb as value, and fully opaque)
-                data.push(u8v);
-                data.push(u8v);
-                data.push(u8v);
-                data.push(255);
-            }
-        }
-
-        Image { ..default() };
-
-        Image::new(
-            Extent3d {
-                width: 128,
-                height: 128,
-                depth_or_array_layers: 1,
-            },
-            TextureDimension::D2,
-            data,
-            TextureFormat::Rgba8UnormSrgb,
-            RenderAssetUsages::default(),
-        )
-    }
-
     pub fn generate2(&self, world_position: Vec3) -> Chunk {
         let mut chunk = Chunk::new();
 

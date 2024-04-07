@@ -8,6 +8,8 @@ use crate::{table::VoxelFace, terrain::Terrain};
 use bevy::prelude::*;
 use fast_surface_nets::ndshape::{ConstShape, ConstShape3usize};
 
+use self::material::ChunkMaterial;
+
 #[derive(Component, Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ChunkId {
     pos: IVec2,
@@ -55,12 +57,12 @@ pub const WORLD_HEIGHT: usize = WORLD_Y as usize * CHUNK_Y;
 
 #[derive(Default, Copy, Clone, Debug, PartialEq)]
 #[repr(u16)]
-pub enum VoxelId { 
+pub enum VoxelId {
     #[default]
     Stone,
     Sand,
     Grass,
-    Snow
+    Snow,
 }
 
 #[derive(Default, Copy, Clone, Debug, PartialEq)]
@@ -75,8 +77,6 @@ pub enum VoxelType {
         density: u8,
     },
 }
-
-
 
 impl VoxelType {
     /// Get the texture index of rhis voxel type
@@ -114,23 +114,12 @@ pub struct Chunk {
     pub blocks: Vec<VoxelType>,
 }
 
-impl Default for Chunk {
-    fn default() -> Self {
-        Chunk::empty()
-    }
-}
-
 impl Chunk {
     /// Create a new chunk with the correct internal voxel size (all air)
     pub fn new() -> Self {
-        let mut blocks = Vec::with_capacity(ChunkShape::SIZE);
-        blocks.resize(ChunkShape::SIZE, VoxelType::Air);
-        Self { blocks }
-    }
-
-    /// Create an empty chunk with no voxel information
-    pub fn empty() -> Self {
-        Self { blocks: Vec::new() }
+        Self {
+            blocks: vec![VoxelType::Air; ChunkShape::SIZE],
+        }
     }
 
     /// Set the block type at the provided position
@@ -182,6 +171,6 @@ pub struct ChunkBundle {
     /// The id of this chunk, used to link up to the world
     pub chunk_id: ChunkId,
 
-    //
-    pub mesh: MaterialMeshBundle<StandardMaterial>,
+    // Bundle containing stuff needed for the mesh
+    pub mesh: MaterialMeshBundle<ChunkMaterial>,
 }

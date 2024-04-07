@@ -72,8 +72,7 @@ impl Plugin for WorldPlugin {
 #[derive(Resource, Default)]
 pub struct World {
     pub chunks: HashMap<ChunkId, Option<Chunk>>,
-    //pub chunk_material: Handle<ChunkMaterial>,
-    pub chunk_material: Handle<StandardMaterial>,
+    pub chunk_material: Handle<ChunkMaterial>,
 }
 
 impl World {

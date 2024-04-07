@@ -6,16 +6,12 @@ use bevy::{
 use crate::{
     table::{
         VoxelFace, CORNERS, EDGES, EDGE_CROSSING_MASK, EDGE_DIRECTION, FACE_BACK, FACE_BOTTOM,
-        FACE_FRONT, FACE_LEFT, FACE_RIGHT, FACE_TOP, INDEX_MAP, NORMAL_MAP, TEXTURE_MAP, TRIANGLES,
-        VERTEX_MAP,
+        FACE_FRONT, FACE_LEFT, FACE_RIGHT, FACE_TOP, INDEX_MAP, NORMAL_MAP, TRIANGLES, VERTEX_MAP,
     },
     terrain::Terrain,
 };
 
-use super::{
-    material::{ATTRIBUTE_BASE_TEXTURE_INDEX, ATTRIBUTE_BASE_VOXEL_INDEX},
-    Chunk, VoxelType, CHUNK_XZ, CHUNK_Y,
-};
+use super::{material::ATTRIBUTE_BASE_VOXEL_INDEX, Chunk, VoxelType, CHUNK_XZ, CHUNK_Y};
 
 pub trait ChunkMesher {
     fn build(chunk: &Chunk, world_position: Vec3, terrain: &Terrain) -> Option<Mesh>;
@@ -35,9 +31,7 @@ impl CubeChunkMesher {
         index: &mut u32,
         vertices: &mut Vec<[f32; 3]>,
         normals: &mut Vec<[f32; 3]>,
-        uvs: &mut Vec<[f32; 2]>,
         voxel_indices: &mut Vec<u32>,
-        texture_indices: &mut Vec<u32>,
         indices: &mut Vec<u32>,
     ) {
         let pos_offset = match face {
@@ -56,10 +50,6 @@ impl CubeChunkMesher {
 
                 vertices.push(v.into());
                 normals.push(NORMAL_MAP[face][i]);
-                uvs.push(TEXTURE_MAP[face][i]);
-
-                texture_indices.push(voxel_type.texture_index(face));
-
                 voxel_indices.push(voxel_type.index() as u32);
             }
 
@@ -81,9 +71,7 @@ impl ChunkMesher for CubeChunkMesher {
 
         let mut vertices: Vec<[f32; 3]> = Vec::new();
         let mut normals: Vec<[f32; 3]> = Vec::new();
-        let mut uvs: Vec<[f32; 2]> = Vec::new();
         let mut voxel_indices: Vec<u32> = Vec::new();
-        let mut texture_indices: Vec<u32> = Vec::new();
 
         let mut indices: Vec<u32> = Vec::new();
 
@@ -112,9 +100,7 @@ impl ChunkMesher for CubeChunkMesher {
                             &mut index,
                             &mut vertices,
                             &mut normals,
-                            &mut uvs,
                             &mut voxel_indices,
-                            &mut texture_indices,
                             &mut indices,
                         );
                     }
@@ -126,9 +112,7 @@ impl ChunkMesher for CubeChunkMesher {
 
         mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
         mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
         mesh.insert_attribute(ATTRIBUTE_BASE_VOXEL_INDEX, voxel_indices);
-        mesh.insert_attribute(ATTRIBUTE_BASE_TEXTURE_INDEX, texture_indices);
         mesh.insert_indices(Indices::U32(indices));
 
         if index_count > 0 {
@@ -247,8 +231,6 @@ impl ChunkMesher for MarchingChunkMesher {
         mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
         mesh.insert_attribute(ATTRIBUTE_BASE_VOXEL_INDEX, voxel_indices);
         mesh.insert_indices(Indices::U32(indices));
-
-        let _ = mesh.generate_tangents();
 
         if index_count > 0 {
             return Some(mesh);
