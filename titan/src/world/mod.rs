@@ -17,7 +17,7 @@ use bevy::prelude::*;
 use std::collections::VecDeque;
 
 /// How many chunks away from the player to render (horizontally)
-pub const RENDER_DISTANCE: usize = 8;
+pub const RENDER_DISTANCE: usize = 12;
 
 // A simple queue that keeps track of what chunks currently
 // need to be loaded into the world. This is done based on the id of the chunk

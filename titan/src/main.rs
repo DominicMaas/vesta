@@ -11,7 +11,7 @@ use bevy::{
         experimental::taa::{TemporalAntiAliasBundle, TemporalAntiAliasPlugin},
     },
     pbr::{light_consts::lux, ScreenSpaceAmbientOcclusionBundle},
-    prelude::*,
+    prelude::*, window::PresentMode,
 };
 use bevy_asset_loader::prelude::*;
 use bevy_atmosphere::{
@@ -90,6 +90,7 @@ fn main() {
                     primary_window: Some(Window {
                         title: "Voxel Game - Dominic Maas".to_string(),
                         resolution: (1920.0, 1080.0).into(),
+                        present_mode: PresentMode::AutoNoVsync,
                         ..default()
                     }),
                     ..default()

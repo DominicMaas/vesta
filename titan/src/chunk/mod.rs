@@ -4,14 +4,9 @@ pub mod material;
 pub mod mesher;
 pub mod tile_map;
 
-use crate::{
-    table::{VoxelFace, FACE_BOTTOM, FACE_TOP},
-    terrain::Terrain,
-};
+use crate::{table::VoxelFace, terrain::Terrain};
 use bevy::prelude::*;
 use fast_surface_nets::ndshape::{ConstShape, ConstShape3usize};
-
-use self::material::ChunkMaterial;
 
 #[derive(Component, Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ChunkId {
@@ -48,7 +43,7 @@ impl ChunkId {
 // Chunk constants
 
 pub const CHUNK_XZ: usize = 16;
-pub const CHUNK_Y: usize = 64;
+pub const CHUNK_Y: usize = 128;
 pub const CHUNK_SZ: usize = CHUNK_XZ * CHUNK_XZ * CHUNK_Y;
 
 pub type ChunkShape = ConstShape3usize<CHUNK_XZ, CHUNK_Y, CHUNK_XZ>;
@@ -59,37 +54,55 @@ pub const WORLD_Y: isize = 1;
 pub const WORLD_HEIGHT: usize = WORLD_Y as usize * CHUNK_Y;
 
 #[derive(Default, Copy, Clone, Debug, PartialEq)]
-#[repr(u32)]
+#[repr(u16)]
+pub enum VoxelId { 
+    #[default]
+    Stone,
+    Sand,
+    Grass,
+    Snow
+}
+
+#[derive(Default, Copy, Clone, Debug, PartialEq)]
 pub enum VoxelType {
     #[default]
     Air,
-    Dirt(f32),
-    Grass(f32),
-    Stone(f32),
+    Solid {
+        id: VoxelId,
+    },
+    Partial {
+        id: VoxelId,
+        density: u8,
+    },
 }
+
+
 
 impl VoxelType {
     /// Get the texture index of rhis voxel type
     pub fn texture_index(&self, face: VoxelFace) -> u32 {
-        match self {
-            VoxelType::Dirt(_) => 0,
-            VoxelType::Grass(_) => match face {
-                FACE_TOP => 1,
-                FACE_BOTTOM => 0,
-                _ => 2,
-            },
-            VoxelType::Stone(_) => 3,
-            _ => 0,
-        }
+        0
     }
 
     /// Get the numerical index of this voxel type
-    pub fn index(&self) -> u32 {
+    pub fn index(&self) -> u16 {
         match self {
-            VoxelType::Air => 0,
-            VoxelType::Dirt(_) => 1,
-            VoxelType::Grass(_) => 2,
-            VoxelType::Stone(_) => 3,
+            VoxelType::Air => 0u16,
+            VoxelType::Solid { id } => *id as u16,
+            VoxelType::Partial { id, density: _ } => *id as u16,
+        }
+    }
+
+    /// Get the density of this block mapped as a float
+    pub fn density_as_float(&self) -> f32 {
+        match self {
+            VoxelType::Air => 0.0,
+            VoxelType::Partial { id: _, density } => Terrain::map_range(
+                (u8::MIN as f32, u8::MAX as f32),
+                (0.0, 1.0),
+                (*density) as f32,
+            ),
+            VoxelType::Solid { id: _ } => 1.0,
         }
     }
 }

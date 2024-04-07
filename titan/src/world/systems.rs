@@ -2,7 +2,7 @@ use crate::{
     atlas::TileAtlasBuilder,
     chunk::{
         material::ChunkMaterial,
-        mesher::{ChunkMesher, CubeChunkMesher, MarchingChunkMesher, SurfaceNetsChunkMesher},
+        mesher::{ChunkMesher, CubeChunkMesher, MarchingChunkMesher},
         tile_map::TileAssets,
         Chunk, ChunkBundle, ChunkId, CHUNK_XZ, CHUNK_Y,
     },
@@ -46,6 +46,10 @@ pub fn setup(
 
     world.chunk_material = materials.add(StandardMaterial {
         base_color: Color::hex("268B07").unwrap(),
+        perceptual_roughness: 0.8,
+        metallic: 0.0,
+        reflectance: 0.4,
+        fog_enabled: true,
         ..default()
     }); //materials.add(ChunkMaterial { texture: atlas.0 });
 }

@@ -4,12 +4,10 @@ use bevy::{
         render_asset::RenderAssetUsages,
         render_resource::{Extent3d, TextureDimension, TextureFormat},
     },
-    utils::hashbrown::raw,
 };
-use bevy_rapier3d::parry::transformation::voxelization::Voxel;
 use bracket_noise::prelude::*;
 
-use crate::chunk::{Chunk, VoxelType, CHUNK_XZ, CHUNK_Y, WORLD_HEIGHT};
+use crate::chunk::{Chunk, VoxelId, VoxelType, CHUNK_XZ, CHUNK_Y};
 
 #[derive(Resource)]
 pub struct Terrain {
@@ -21,7 +19,7 @@ impl Terrain {
         let mut noise_func = FastNoise::seeded(seed);
         noise_func.set_noise_type(NoiseType::SimplexFractal);
         noise_func.set_fractal_type(FractalType::FBM);
-        noise_func.set_fractal_octaves(5);
+        noise_func.set_fractal_octaves(6);
         noise_func.set_fractal_gain(0.5);
         noise_func.set_fractal_lacunarity(2.0);
         noise_func.set_frequency(0.2);
@@ -38,13 +36,9 @@ impl Terrain {
 
                 // Determine the highest point
                 for cy in 0..CHUNK_Y {
-                    let y_value =
-                        match self.get_block_type(Vec3::new(cx as f32, cy as f32, cz as f32)) {
-                            VoxelType::Air => 0.0,
-                            VoxelType::Dirt(d) => d,
-                            VoxelType::Grass(d) => d,
-                            VoxelType::Stone(d) => d,
-                        };
+                    let y_value = self
+                        .get_block_type(Vec3::new(cx as f32, cy as f32, cz as f32))
+                        .density_as_float();
 
                     if y_value <= 0.0 {
                         value = (cy as f32) + y_value;
@@ -52,7 +46,11 @@ impl Terrain {
                     }
                 }
 
-                let u8v = Self::map_range((0.0, CHUNK_Y as f32), (0.0, 255.0), value) as u8;
+                let u8v = Self::map_range(
+                    (0.0, CHUNK_Y as f32),
+                    (u8::MIN as f32, u8::MAX as f32),
+                    value,
+                ) as u8;
 
                 // Turn this range into a color (rgb as value, and fully opaque)
                 data.push(u8v);
@@ -111,27 +109,7 @@ impl Terrain {
 
     /// Gets the block type at this position
     pub fn get_block_type(&self, position: Vec3) -> VoxelType {
-        /*  let height = 16.0
-            + ((CHUNK_Y as f32)
-                * self.noise_func.get_noise(
-                    position.x / 16.0 * 1.5 + 0.001,
-                    position.z / 16.0 * 1.5 + 0.001,
-                ));
-
-        if position.y <= 4.0 {
-            return VoxelType::Stone(0.0);
-        }
-
-        if position.y <= height - 0.5 {
-            VoxelType::Stone(0.0)
-        } else if position.y > height + 0.5 {
-            VoxelType::Air
-        } else if position.y > height {
-            VoxelType::Stone(position.y - height)
-        } else {
-            VoxelType::Stone(height - position.y)
-        }*/
-
+        
         let mut height = (CHUNK_Y as f32 / 2.0)
             * self.noise_func.get_noise(
                 position.x / 64.0 * 1.5 + 0.001,
@@ -139,23 +117,23 @@ impl Terrain {
             );
 
         height = (CHUNK_Y as f32 / 4.0) + height;
-        
+
         if position.y <= 10.0 {
-            return VoxelType::Stone(255.0);
+            return VoxelType::Solid { id: VoxelId::Stone };
         }
-        
+
         if height > position.y {
-            let mut diff = height - position.y;
+            let diff = height - position.y;
             if diff <= 1.0 {
-                diff = (Self::map_range((0.0, 1.0), (u8::MIN as f32, u8::MAX as f32), diff) as u8) as f32;
-                
-                return VoxelType::Stone(diff);
+                return VoxelType::Partial {
+                    id: VoxelId::Stone,
+                    density: Self::map_range((0.0, 1.0), (u8::MIN as f32, u8::MAX as f32), diff)
+                        as u8,
+                };
             }
 
-            return VoxelType::Stone(255.0);
+            return VoxelType::Solid { id: VoxelId::Stone };
         } else {
-           
-            
             return VoxelType::Air;
         }
 
