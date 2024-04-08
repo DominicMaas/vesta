@@ -11,7 +11,8 @@ use bevy::{
         experimental::taa::{TemporalAntiAliasBundle, TemporalAntiAliasPlugin},
     },
     pbr::{light_consts::lux, wireframe::WireframePlugin, ScreenSpaceAmbientOcclusionBundle},
-    prelude::*, window::PresentMode,
+    prelude::*,
+    window::PresentMode,
 };
 use bevy_asset_loader::prelude::*;
 use bevy_atmosphere::{
@@ -51,7 +52,7 @@ pub struct GeneralAssets {
 
     #[asset(path = "environment/pisa_specular_rgb9e5_zstd.ktx2")]
     pub specular_map: Handle<Image>,
-    
+
     #[asset(path = "fonts/BerkeleyMono-Regular.ttf")]
     pub ui_font: Handle<Font>,
 }
@@ -66,7 +67,6 @@ enum AppState {
 fn main() {
     App::new()
         .init_state::<AppState>()
-        .insert_resource(Msaa::Sample4)
         .insert_resource(AtmosphereModel::default())
         .insert_resource(AmbientLight {
             color: Color::WHITE,
@@ -96,9 +96,8 @@ fn main() {
                     ..default()
                 }),
         )
-        .add_plugins(WireframePlugin)
-        .add_plugins(PlayerPlugin)
         .add_plugins(TemporalAntiAliasPlugin)
+        .add_plugins(PlayerPlugin)
         .add_plugins(WorldPlugin)
         .add_plugins(EguiPlugin)
         .add_plugins(PerfUiPlugin)
@@ -138,54 +137,6 @@ fn setup(
         },
         Sun,
     ));
-    // Sky
-    /*commands.spawn((
-        PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Box::default())),
-            material: materials.add(StandardMaterial {
-                base_color: Color::hex("888888").unwrap(),
-                unlit: true,
-                cull_mode: None,
-                ..default()
-            }),
-            transform: Transform::from_scale(Vec3::splat(1000.0)),
-            ..default()
-        },
-        NotShadowCaster,
-    ))*/
-
-    commands
-        .spawn(PbrBundle {
-            mesh: meshes.add(Mesh::from(Cuboid::from_size((1.0, 1.0, 1.0).into()))),
-            material: materials.add(StandardMaterial::from(Color::rgb(0.8, 0.2, 0.2))),
-            ..default()
-        })
-        .insert(RigidBody::Dynamic)
-        .insert(Collider::cuboid(0.5, 0.5, 0.5))
-        .insert(Restitution::coefficient(0.7))
-        .insert(TransformBundle::from(Transform::from_xyz(0.0, 64.0, 0.0)));
-
-    commands
-        .spawn(PbrBundle {
-            mesh: meshes.add(Mesh::from(Cuboid::from_size((1.0, 1.0, 1.0).into()))),
-            material: materials.add(StandardMaterial::from(Color::rgb(0.2, 0.2, 0.8))),
-            ..default()
-        })
-        .insert(RigidBody::Dynamic)
-        .insert(Collider::cuboid(0.5, 0.5, 0.5))
-        .insert(Restitution::coefficient(0.7))
-        .insert(TransformBundle::from(Transform::from_xyz(0.0, 64.0, 1.0)));
-
-    commands
-        .spawn(PbrBundle {
-            mesh: meshes.add(Mesh::from(Cuboid::from_size((2.0, 2.0, 2.0).into()))),
-            material: materials.add(StandardMaterial::from(Color::rgb(1.0, 1.0, 1.0))),
-            ..default()
-        })
-        .insert(RigidBody::Dynamic)
-        .insert(Collider::cuboid(1.0, 1.0, 1.0))
-        .insert(Restitution::coefficient(0.7))
-        .insert(TransformBundle::from(Transform::from_xyz(1.0, 64.0, 0.0)));
 
     // Camera
     commands
@@ -196,6 +147,10 @@ fn setup(
                     hdr: true,
                     ..default()
                 },
+                projection: Projection::Perspective(PerspectiveProjection {
+                    far: 2000.0,
+                    ..default()
+                }),
                 ..default()
             },
             BloomSettings::NATURAL,
@@ -204,11 +159,7 @@ fn setup(
                 color: Color::rgba(0.2, 0.2, 0.2, 1.0),
                 directional_light_color: Color::rgba(1.0, 0.95, 0.75, 0.5),
                 directional_light_exponent: 6.0,
-                falloff: FogFalloff::from_visibility_colors(
-                    600.0, // distance in world units up to which objects retain visibility (>= 5% contrast)
-                    Color::rgb(0.35, 0.5, 0.33), // atmospheric extinction color (after light is lost due to absorption by atmospheric particles)
-                    Color::rgb(0.8, 0.8, 0.4), // atmospheric inscattering color (light gained due to scattering from the sun)
-                ),
+                falloff: FogFalloff::from_visibility_color(600.0, Color::rgb(1.0, 0.95, 0.75)),
             },
         ))
         .insert(ScreenSpaceAmbientOcclusionBundle::default())

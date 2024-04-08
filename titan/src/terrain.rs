@@ -5,6 +5,7 @@ use bevy::{
         render_resource::{Extent3d, TextureDimension, TextureFormat},
     },
 };
+use bevy_rapier3d::parry::transformation::voxelization::Voxel;
 use bracket_noise::prelude::*;
 
 use crate::chunk::{Chunk, VoxelId, VoxelType, CHUNK_XZ, CHUNK_Y};
@@ -19,10 +20,10 @@ impl Terrain {
         let mut noise_func = FastNoise::seeded(seed);
         noise_func.set_noise_type(NoiseType::SimplexFractal);
         noise_func.set_fractal_type(FractalType::FBM);
-        noise_func.set_fractal_octaves(6);
-        noise_func.set_fractal_gain(0.5);
+        noise_func.set_fractal_octaves(8);
+        noise_func.set_fractal_gain(0.4);
         noise_func.set_fractal_lacunarity(2.0);
-        noise_func.set_frequency(0.2);
+        noise_func.set_frequency(0.14);
 
         Self { noise_func }
     }
@@ -61,30 +62,69 @@ impl Terrain {
 
     /// Gets the block type at this position
     pub fn get_block_type(&self, position: Vec3) -> VoxelType {
-        
         let mut height = (CHUNK_Y as f32 / 2.0)
             * self.noise_func.get_noise(
                 position.x / 64.0 * 1.5 + 0.001,
                 position.z / 64.0 * 1.5 + 0.001,
             );
 
-        height = (CHUNK_Y as f32 / 4.0) + height;
+        height = (CHUNK_Y as f32 / 2.0) + height;
 
-        if position.y <= 10.0 {
-            return VoxelType::Solid { id: VoxelId::Stone };
+        if position.y <= 80.0 {
+            return VoxelType::Solid { id: VoxelId::Water };
         }
+
+        let mut id = VoxelId::Grass;
+
+        if position.y <= 90.0 {
+            id = VoxelId::Sand;
+        }
+
+        if position.y > 150.0 {
+            id = VoxelId::Stone;
+        }
+
+        if position.y > 160.0 {
+            id = VoxelId::Snow;
+        }
+
+        /*  if position.y <= height - 0.5 {
+            return VoxelType::Solid { id: id };
+        } else if position.y > height + 0.5 {
+            return VoxelType::Air;
+        } else if position.y > height {
+            return VoxelType::Partial {
+                id: id,
+                density: Self::map_range(
+                    (0.0, 1.0),
+                    (u8::MIN as f32, u8::MAX as f32),
+                    1.0 - (position.y - height),
+                ) as u8,
+            };
+        } else {
+            return VoxelType::Partial {
+                id: id,
+                density: Self::map_range(
+                    (0.0, 1.0),
+                    (u8::MIN as f32, u8::MAX as f32),
+                    1.0 - (height - position.y),
+                ) as u8,
+            };
+        }*/
 
         if height > position.y {
             let diff = height - position.y;
             if diff <= 1.0 {
+                assert!(diff >= 0.0);
+                assert!(diff <= 1.0);
+
                 return VoxelType::Partial {
-                    id: VoxelId::Stone,
-                    density: Self::map_range((0.0, 1.0), (u8::MIN as f32, u8::MAX as f32), diff)
-                        as u8,
+                    id,
+                    density: (diff * 100.0) as u8,
                 };
             }
 
-            return VoxelType::Solid { id: VoxelId::Stone };
+            return VoxelType::Solid { id };
         } else {
             return VoxelType::Air;
         }

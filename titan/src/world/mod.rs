@@ -1,7 +1,7 @@
 mod systems;
 
 use bevy::{tasks::Task, utils::HashMap};
-use fast_surface_nets::ndshape::ConstShape;
+use ndshape::ConstShape;
 
 use self::systems::{
     apply_chunk_load_tasks, chunk_gizmos, prepare_chunk_load_tasks, process_chunk_state_on_camera,
@@ -17,7 +17,7 @@ use bevy::prelude::*;
 use std::collections::VecDeque;
 
 /// How many chunks away from the player to render (horizontally)
-pub const RENDER_DISTANCE: usize = 12;
+pub const RENDER_DISTANCE: usize = 28;
 
 // A simple queue that keeps track of what chunks currently
 // need to be loaded into the world. This is done based on the id of the chunk

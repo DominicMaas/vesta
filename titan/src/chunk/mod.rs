@@ -6,7 +6,7 @@ pub mod tile_map;
 
 use crate::{table::VoxelFace, terrain::Terrain};
 use bevy::prelude::*;
-use fast_surface_nets::ndshape::{ConstShape, ConstShape3usize};
+use ndshape::{ConstShape, ConstShape3usize};
 
 use self::material::ChunkMaterial;
 
@@ -45,12 +45,12 @@ impl ChunkId {
 // Chunk constants
 
 pub const CHUNK_XZ: usize = 16;
-pub const CHUNK_Y: usize = 128;
+pub const CHUNK_Y: usize = 256;
 pub const CHUNK_SZ: usize = CHUNK_XZ * CHUNK_XZ * CHUNK_Y;
 
 pub type ChunkShape = ConstShape3usize<CHUNK_XZ, CHUNK_Y, CHUNK_XZ>;
 
-pub const WORLD_XZ: isize = 18;
+pub const WORLD_XZ: isize = 24;
 pub const WORLD_Y: isize = 1;
 
 pub const WORLD_HEIGHT: usize = WORLD_Y as usize * CHUNK_Y;
@@ -59,10 +59,11 @@ pub const WORLD_HEIGHT: usize = WORLD_Y as usize * CHUNK_Y;
 #[repr(u16)]
 pub enum VoxelId {
     #[default]
-    Stone,
-    Sand,
-    Grass,
-    Snow,
+    Stone = 1,
+    Sand = 2,
+    Grass = 3,
+    Snow = 4,
+    Water = 5,
 }
 
 #[derive(Default, Copy, Clone, Debug, PartialEq)]
@@ -97,11 +98,7 @@ impl VoxelType {
     pub fn density_as_float(&self) -> f32 {
         match self {
             VoxelType::Air => 0.0,
-            VoxelType::Partial { id: _, density } => Terrain::map_range(
-                (u8::MIN as f32, u8::MAX as f32),
-                (0.0, 1.0),
-                (*density) as f32,
-            ),
+            VoxelType::Partial { id: _, density } => (*density as f32) / 100.0,
             VoxelType::Solid { id: _ } => 1.0,
         }
     }

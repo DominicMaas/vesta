@@ -151,26 +151,24 @@ impl ChunkMesher for MarchingChunkMesher {
 
         let mut index = 0;
 
-        let mut edge_verts = vec![Vec3::new(0.0, 0.0, 0.0); 12];
-
         for x in 0..(CHUNK_XZ) {
             for y in 0..(CHUNK_Y) {
                 for z in 0..(CHUNK_XZ) {
                     let position = Vec3::new(x as f32, y as f32, z as f32);
-                    let voxel_type = chunk.get_t_block(world_position, position, terrain);
 
                     // An array of sampled points
-                    let mut cube = [0.0; 8];
+                    let mut cube = [VoxelType::Air; 8];
+
+                    let mut edge_verts = vec![Vec3::new(0.0, 0.0, 0.0); 12];
+                    let mut edge_types = vec![VoxelType::Air; 12];
 
                     // Calculate the cube index by looking at all 8 corners of the current
                     // voxel
                     let mut cube_index = 0;
                     for i in 0..8 {
-                        cube[i] = chunk
-                            .get_t_block(world_position, position + CORNERS[i], terrain)
-                            .density_as_float();
+                        cube[i] = chunk.get_t_block(world_position, position + CORNERS[i], terrain);
 
-                        if cube[i] < SURFACE {
+                        if cube[i].density_as_float() < SURFACE {
                             cube_index |= 1 << i;
                         }
                     }
@@ -187,10 +185,25 @@ impl ChunkMesher for MarchingChunkMesher {
                     for i in 0..12 {
                         // if there is an intersection on this edge
                         if (edge_flags & (1 << i)) != 0 {
-                            let offset = Self::get_offset(cube[EDGES[i][0]], cube[EDGES[i][1]]);
+                            let offset = Self::get_offset(
+                                cube[EDGES[i][0]].density_as_float(),
+                                cube[EDGES[i][1]].density_as_float(),
+                            );
 
-                            let v = position + CORNERS[EDGES[i][0]] + offset * EDGE_DIRECTION[i];
-                            edge_verts[i] = v;
+                            edge_verts[i] =
+                                position + CORNERS[EDGES[i][0]] + offset * EDGE_DIRECTION[i];
+
+                            edge_types[i] = if offset >= 0.5 {
+                                match cube[EDGES[i][1]] {
+                                    VoxelType::Air => cube[EDGES[i][0]],
+                                    _ => cube[EDGES[i][1]],
+                                }
+                            } else {
+                                match cube[EDGES[i][0]] {
+                                    VoxelType::Air => cube[EDGES[i][1]],
+                                    _ => cube[EDGES[i][0]],
+                                }
+                            }
                         }
                     }
 
@@ -201,9 +214,8 @@ impl ChunkMesher for MarchingChunkMesher {
                             break;
                         }
 
-                        let v = edge_verts[edge_index as usize];
-                        vertices.push(v.into());
-                        voxel_indices.push(voxel_type.index() as u32);
+                        vertices.push(edge_verts[edge_index as usize].into());
+                        voxel_indices.push(edge_types[edge_index as usize].index() as u32);
                         indices.push(index);
 
                         index = index + 1;

@@ -105,15 +105,15 @@ pub fn apply_chunk_load_tasks(
                     },
                 })
                 .insert(chunk_mesh_handle)
-                .insert(RigidBody::Fixed)
+                //.insert(RigidBody::Fixed)
                 .insert(Name::new(format!(
                     "Chunk: {}",
                     chunk_data.0.world_position()
-                )))
-                .insert(
-                    Collider::from_bevy_mesh(&collider_mesh, &ComputedColliderShape::TriMesh)
-                        .unwrap(),
-                );
+                )));
+                //.insert(
+                //    Collider::from_bevy_mesh(&collider_mesh, &ComputedColliderShape::TriMesh)
+                //        .unwrap(),
+                //);
         }
     }
 }
