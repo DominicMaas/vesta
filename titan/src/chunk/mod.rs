@@ -4,7 +4,7 @@ pub mod material;
 pub mod mesher;
 pub mod tile_map;
 
-use crate::{table::VoxelFace, terrain::Terrain};
+use crate::terrain::Terrain;
 use bevy::prelude::*;
 use ndshape::{ConstShape, ConstShape3usize};
 
@@ -56,7 +56,7 @@ pub const WORLD_Y: isize = 1;
 pub const WORLD_HEIGHT: usize = WORLD_Y as usize * CHUNK_Y;
 
 #[derive(Default, Copy, Clone, Debug, PartialEq)]
-#[repr(u16)]
+#[repr(u8)]
 pub enum VoxelId {
     #[default]
     Stone = 1,
@@ -64,6 +64,19 @@ pub enum VoxelId {
     Grass = 3,
     Snow = 4,
     Water = 5,
+}
+
+impl VoxelId {
+    pub fn from_u8(value: u8) -> Option<VoxelId> {
+        match value {
+            1 => Some(VoxelId::Stone),
+            2 => Some(VoxelId::Sand),
+            3 => Some(VoxelId::Grass),
+            4 => Some(VoxelId::Snow),
+            5 => Some(VoxelId::Water),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Default, Copy, Clone, Debug, PartialEq)]
@@ -80,17 +93,12 @@ pub enum VoxelType {
 }
 
 impl VoxelType {
-    /// Get the texture index of rhis voxel type
-    pub fn texture_index(&self, face: VoxelFace) -> u32 {
-        0
-    }
-
     /// Get the numerical index of this voxel type
-    pub fn index(&self) -> u16 {
+    pub fn index(&self) -> u8 {
         match self {
-            VoxelType::Air => 0u16,
-            VoxelType::Solid { id } => *id as u16,
-            VoxelType::Partial { id, density: _ } => *id as u16,
+            VoxelType::Air => 0u8,
+            VoxelType::Solid { id } => *id as u8,
+            VoxelType::Partial { id, density: _ } => *id as u8,
         }
     }
 
@@ -104,24 +112,26 @@ impl VoxelType {
     }
 }
 
+// 1,250 (before)
+
 /// Represents a single chunk in the world
 #[derive(Component, Debug)]
 pub struct Chunk {
     /// 1D Array of all blocks in this chunk
-    pub blocks: Vec<VoxelType>,
+    blocks: Vec<u16>,
 }
 
 impl Chunk {
     /// Create a new chunk with the correct internal voxel size (all air)
     pub fn new() -> Self {
         Self {
-            blocks: vec![VoxelType::Air; ChunkShape::SIZE],
+            blocks: vec![0; ChunkShape::SIZE],
         }
     }
 
     /// Set the block type at the provided position
     pub fn set_block(&mut self, x: usize, y: usize, z: usize, voxel_type: VoxelType) {
-        self.blocks[ChunkShape::linearize([x, y, z])] = voxel_type;
+        self.blocks[ChunkShape::linearize([x, y, z])] = Self::voxel_to_internal(voxel_type);
     }
 
     /// Get the block type at the provided position
@@ -131,7 +141,7 @@ impl Chunk {
             return VoxelType::Air;
         }
 
-        self.blocks[ChunkShape::linearize([x, y, z])]
+        Self::internal_to_voxel(self.blocks[ChunkShape::linearize([x, y, z])])
     }
 
     /// Get the block type at the provided position
@@ -159,6 +169,44 @@ impl Chunk {
     /// Used for block culling
     pub fn is_transparent(&self, world_position: Vec3, position: Vec3, terrain: &Terrain) -> bool {
         self.get_t_block(world_position, position, terrain) == VoxelType::Air
+    }
+
+    /// Turns the internal representation of a voxel to a friendly
+    /// external format
+    fn internal_to_voxel(internal: u16) -> VoxelType {
+        let mut buf = [0; 2];
+        buf.copy_from_slice(&internal.to_le_bytes());
+
+        if buf[0] == 100 {
+            VoxelType::Solid {
+                id: VoxelId::from_u8(buf[1]).unwrap(),
+            }
+        } else if buf[0] == 0 {
+            VoxelType::Air
+        } else {
+            VoxelType::Partial {
+                id: VoxelId::from_u8(buf[1]).unwrap(),
+                density: buf[0],
+            }
+        }
+    }
+
+    /// Turns a friendly representation of a voxel to the internal
+    /// packed representation
+    fn voxel_to_internal(voxel: VoxelType) -> u16 {
+        let density = match voxel {
+            VoxelType::Air => 0,
+            VoxelType::Solid { id: _ } => 100,
+            VoxelType::Partial { id: _, density } => density,
+        };
+
+        let id = match voxel {
+            VoxelType::Air => 0u8,
+            VoxelType::Solid { id } => id as u8,
+            VoxelType::Partial { id, density: _ } => id as u8,
+        };
+
+        u16::from_le_bytes([density, id].try_into().unwrap())
     }
 }
 

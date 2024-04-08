@@ -1,6 +1,6 @@
 use bevy::{math::bounding::RayCast3d, prelude::*};
 
-use crate::{chunk::VoxelType, GeneralAssets, Player};
+use crate::{chunk::{ChunkId, VoxelType}, GeneralAssets, Player};
 
 #[derive(Component)]
 pub struct DebugMenu;
@@ -32,6 +32,7 @@ pub fn setup(
                 TextSection::new("Chunk: -\n\n", style.clone()),
                 TextSection::new("Selector Chunk: -\n", style.clone()),
                 TextSection::new("Selector Block: -\n", style.clone()),
+                TextSection::new("\nLoaded Chunks: -\n", style.clone()),
             ])
             .with_style(Style {
                 position_type: PositionType::Absolute,
@@ -47,7 +48,6 @@ pub fn draw_cursor(
     camera_query: Query<(&Camera, &GlobalTransform), With<Player>>,
     windows: Query<&Window>,
     world: Res<crate::world::World>,
-
     mut text: Query<&mut Text, With<DebugMenu>>,
     mut gizmos: Gizmos,
 ) {
@@ -67,10 +67,13 @@ pub fn draw_cursor(
 
     text.single_mut().sections[3].value = format!("Selector Chunk: -\n");
     text.single_mut().sections[4].value = format!("Selector Block: -\n");
+    text.single_mut().sections[5].value = format!("\nLoaded Chunks: {}\n", world.chunks.len());
 
     let w = window.width();
     let h = window.height();
 
+    
+    
     // Calculate a ray pointing from the camera into the world from the center of the screen
     if let Some(ray) = camera.viewport_to_world(camera_transform, (w / 2., h / 2.).into()) {
         let _ray_cast = RayCast3d::from_ray(ray, 200.0);

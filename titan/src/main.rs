@@ -10,9 +10,8 @@ use bevy::{
         bloom::BloomSettings,
         experimental::taa::{TemporalAntiAliasBundle, TemporalAntiAliasPlugin},
     },
-    pbr::{light_consts::lux, wireframe::WireframePlugin, ScreenSpaceAmbientOcclusionBundle},
+    pbr::{light_consts::lux, ScreenSpaceAmbientOcclusionBundle},
     prelude::*,
-    window::PresentMode,
 };
 use bevy_asset_loader::prelude::*;
 use bevy_atmosphere::{
@@ -21,8 +20,6 @@ use bevy_atmosphere::{
     plugin::{AtmosphereCamera, AtmospherePlugin},
     system_param::AtmosphereMut,
 };
-use bevy_egui::{egui, EguiContexts, EguiPlugin};
-use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier3d::prelude::*;
 use chunk::{material::ChunkMaterial, tile_map::TileAssets};
 use iyes_perf_ui::{PerfUiCompleteBundle, PerfUiPlugin};
@@ -90,7 +87,6 @@ fn main() {
                     primary_window: Some(Window {
                         title: "Voxel Game - Dominic Maas".to_string(),
                         resolution: (1920.0, 1080.0).into(),
-                        present_mode: PresentMode::AutoNoVsync,
                         ..default()
                     }),
                     ..default()
@@ -99,15 +95,12 @@ fn main() {
         .add_plugins(TemporalAntiAliasPlugin)
         .add_plugins(PlayerPlugin)
         .add_plugins(WorldPlugin)
-        .add_plugins(EguiPlugin)
         .add_plugins(PerfUiPlugin)
         .add_plugins(AtmospherePlugin)
         .add_plugins(LookTransformPlugin)
         .add_plugins(FpsCameraPlugin::default())
-        //.add_plugins(WorldInspectorPlugin::new())
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugins(MaterialPlugin::<ChunkMaterial>::default())
-        //.add_plugins(RapierDebugRenderPlugin::default())
         .add_loading_state(
             LoadingState::new(AppState::Loading)
                 .load_collection::<GeneralAssets>()
