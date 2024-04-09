@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::{
     chunk::{
         material::ChunkMaterial,
@@ -39,6 +41,11 @@ pub fn process_chunk_state_on_camera(
 
             // If this chunk doesn't exist, create it
             if !world.chunks.contains_key(&chunk_id) {
+                // Only 100 per frame
+                if queue.0.len() > 500 {
+                    return;
+                }
+
                 // Insert an empty chunk into the world. This is just to allocate the position in the map
                 // we will fill it with voxel data later
                 world.chunks.insert(chunk_id, None);
@@ -54,6 +61,7 @@ pub fn prepare_chunk_load_tasks(
     mut queue: ResMut<ChunkLoadQueue>,
     terrain_res: Res<Terrain>,
     mut world: ResMut<crate::world::World>,
+    tasks: Query<&ChunkLoadTask>,
 ) {
     let thread_pool = AsyncComputeTaskPool::get();
 
@@ -73,6 +81,15 @@ pub fn prepare_chunk_load_tasks(
 
             commands.spawn(ChunkLoadTask(task));
         }
+
+        // if tasks.iter().len() > 0 {
+        //     println!("{} tasks in generate queue...", tasks.iter().len());
+        // }
+
+        // Only be spawning 5 chunks at once?
+         if tasks.iter().len() >= 50 {
+            break;
+        }
     }
 }
 
@@ -87,7 +104,7 @@ pub fn apply_chunk_load_tasks(
         if let Some(chunk_data) = future::block_on(future::poll_once(&mut task.0)) {
             // Add this mesh to our world
             let chunk_mesh_handle = meshes.add(chunk_data.2);
-            let collider_mesh = meshes.get(&chunk_mesh_handle.clone()).unwrap();
+         //   let collider_mesh = meshes.get(&chunk_mesh_handle.clone()).unwrap();
 
             // Ensure our world has the new chunk data
             world.chunks.insert(chunk_data.0, Some(chunk_data.1));
@@ -110,10 +127,10 @@ pub fn apply_chunk_load_tasks(
                     "Chunk: {}",
                     chunk_data.0.world_position()
                 )));
-                //.insert(
-                //    Collider::from_bevy_mesh(&collider_mesh, &ComputedColliderShape::TriMesh)
-                //        .unwrap(),
-                //);
+            //.insert(
+            //    Collider::from_bevy_mesh(&collider_mesh, &ComputedColliderShape::TriMesh)
+            //        .unwrap(),
+            //);
         }
     }
 }

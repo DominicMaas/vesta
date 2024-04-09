@@ -162,7 +162,7 @@ fn setup(
                 translate_sensitivity: 50.0,
                 ..default()
             },
-            Vec3::new(0.0, 32.0, 5.0),
+            Vec3::new(0.0, 232.0, 0.0),
             Vec3::new(0., 32.0, 0.),
             Vec3::Y,
         ))

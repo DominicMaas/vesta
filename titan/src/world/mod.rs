@@ -27,6 +27,14 @@ pub struct ChunkLoadQueue(pub VecDeque<ChunkId>);
 #[derive(Component)]
 pub struct ChunkLoadTask(Task<(ChunkId, Chunk, Mesh)>);
 
+/// Represents a task that takes in a chunk with data, and generates a mesh
+#[derive(Component)]
+pub struct ChunkMeshingTask(Task<Mesh>);
+
+/// Represents a task that takes in a chunk position, and generates required data for it
+#[derive(Component)]
+pub struct ChunkGenerationTask(Task<Chunk>);
+
 pub struct WorldPlugin;
 
 // TODO: Split meshing into a separate task

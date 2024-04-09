@@ -8,7 +8,7 @@ use bevy::{
 use bevy_rapier3d::parry::transformation::voxelization::Voxel;
 use bracket_noise::prelude::*;
 
-use crate::chunk::{Chunk, VoxelId, VoxelType, CHUNK_XZ, CHUNK_Y};
+use crate::chunk::{Chunk, ChunkShape, VoxelId, VoxelType, CHUNK_XZ, CHUNK_Y};
 
 #[derive(Resource)]
 pub struct Terrain {
@@ -30,11 +30,11 @@ impl Terrain {
 
     pub fn generate2(&self, world_position: Vec3) -> Chunk {
         let mut chunk = Chunk::new();
-
+        
         // Load in some initial terrain
-        for cx in 0..CHUNK_XZ {
+        for cz in 0..CHUNK_XZ {
             for cy in 0..CHUNK_Y {
-                for cz in 0..CHUNK_XZ {
+                for cx in 0..CHUNK_XZ {
                     let c_pos = Vec3::new(cx as f32, cy as f32, cz as f32) + world_position;
                     let block_type = self.get_block_type(c_pos);
 
@@ -48,9 +48,9 @@ impl Terrain {
 
     pub fn generate(&self, chunk: &mut Chunk, world_position: Vec3) {
         // Load in some initial terrain
-        for cx in 0..CHUNK_XZ {
+        for cz in 0..CHUNK_XZ {
             for cy in 0..CHUNK_Y {
-                for cz in 0..CHUNK_XZ {
+                for cx in 0..CHUNK_XZ {
                     let c_pos = Vec3::new(cx as f32, cy as f32, cz as f32) + world_position;
                     let block_type = self.get_block_type(c_pos);
 
@@ -294,9 +294,5 @@ impl Terrain {
          }
 
          t*/*/
-    }
-
-    pub fn map_range(from_range: (f32, f32), to_range: (f32, f32), s: f32) -> f32 {
-        to_range.0 + (s - from_range.0) * (to_range.1 - to_range.0) / (from_range.1 - from_range.0)
     }
 }
