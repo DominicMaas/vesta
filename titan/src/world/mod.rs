@@ -115,6 +115,17 @@ impl World {
         }
     }
 
+    pub fn set_block(&mut self, position: Vec3, voxel_type: VoxelType) {
+        let id = Self::get_id_for_position(position);
+        let [x, y, z] = id.world_position_to_local(position);
+
+        if let Some(c_o) = self.chunks.get_mut(&id) {
+            if let Some(chunk) = c_o {
+                chunk.set_block(x, y, z, voxel_type);
+            }
+        }
+    }
+
     /// Given world coordinates, determines the chunk id which contains these
     /// coordinates
     pub fn get_id_for_position(position: Vec3) -> ChunkId {

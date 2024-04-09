@@ -1,6 +1,10 @@
 use bevy::{math::bounding::RayCast3d, prelude::*};
 
-use crate::{chunk::{ChunkId, VoxelType}, GeneralAssets, Player};
+use crate::{
+    chunk::{ChunkId, VoxelId, VoxelType},
+    world::NeedsRemesh,
+    GeneralAssets, Player,
+};
 
 #[derive(Component)]
 pub struct DebugMenu;
@@ -45,11 +49,14 @@ pub fn setup(
 }
 
 pub fn draw_cursor(
+    mut commands: Commands,
     camera_query: Query<(&Camera, &GlobalTransform), With<Player>>,
     windows: Query<&Window>,
-    world: Res<crate::world::World>,
+    mut world: ResMut<crate::world::World>,
     mut text: Query<&mut Text, With<DebugMenu>>,
     mut gizmos: Gizmos,
+    mouse_button_input: Res<ButtonInput<MouseButton>>,
+    chunk_entities: Query<(Entity, &ChunkId)>,
 ) {
     let (camera, camera_transform) = camera_query.single();
     let window = windows.single();
@@ -72,8 +79,6 @@ pub fn draw_cursor(
     let w = window.width();
     let h = window.height();
 
-    
-    
     // Calculate a ray pointing from the camera into the world from the center of the screen
     if let Some(ray) = camera.viewport_to_world(camera_transform, (w / 2., h / 2.).into()) {
         let _ray_cast = RayCast3d::from_ray(ray, 200.0);
@@ -104,6 +109,34 @@ pub fn draw_cursor(
                     Quat::from_rotation_x(0.0),
                     Color::GREEN,
                 );
+
+                if mouse_button_input.just_released(MouseButton::Left) {
+                    world.set_block(r, VoxelType::Solid { id: VoxelId::Stone });
+
+                    // mark dirty
+                    let updated_id = crate::world::World::get_id_for_position(r);
+                    chunk_entities
+                        .iter()
+                        .filter(|(_entity, &id)| id == updated_id)
+                        .for_each(|(entity, _id)| {
+                            println!("marking {} as dirty!", updated_id);
+                            commands.entity(entity).try_insert(NeedsRemesh);
+                        });
+                }
+
+                if mouse_button_input.just_released(MouseButton::Right) {
+                    world.set_block(r, VoxelType::Air);
+
+                     // mark dirty
+                    let updated_id = crate::world::World::get_id_for_position(r);
+                    chunk_entities
+                        .iter()
+                        .filter(|(_entity, &id)| id == updated_id)
+                        .for_each(|(entity, _id)| {
+                            println!("marking {} as dirty!", updated_id);
+                            commands.entity(entity).try_insert(NeedsRemesh);
+                        });
+                }
             }
         }
     };
