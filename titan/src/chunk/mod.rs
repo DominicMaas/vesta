@@ -115,7 +115,7 @@ impl VoxelType {
 // 1,250 (before)
 
 /// Represents a single chunk in the world
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Clone)]
 pub struct Chunk {
     /// 1D Array of all blocks in this chunk
     blocks: Vec<u16>,

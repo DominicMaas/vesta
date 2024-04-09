@@ -87,6 +87,7 @@ fn main() {
                     primary_window: Some(Window {
                         title: "Voxel Game - Dominic Maas".to_string(),
                         resolution: (1920.0, 1080.0).into(),
+                        present_mode: bevy::window::PresentMode::AutoNoVsync,
                         ..default()
                     }),
                     ..default()

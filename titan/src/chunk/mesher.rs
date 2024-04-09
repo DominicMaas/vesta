@@ -140,7 +140,7 @@ impl ChunkMesher for MarchingChunkMesher {
     fn build(chunk: &Chunk, world_position: Vec3, terrain: &Terrain) -> Option<Mesh> {
         let mut mesh = Mesh::new(
             PrimitiveTopology::TriangleList,
-            RenderAssetUsages::RENDER_WORLD,
+            RenderAssetUsages::default(),
         );
 
         let mut vertices: Vec<[f32; 3]> = Vec::new();
@@ -248,6 +248,23 @@ impl ChunkMesher for MarchingChunkMesher {
             return Some(mesh);
         }
 
-        return Some(Mesh::from(Cuboid::new(1.0, 1.0, 1.0)));
+        Some(Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default()))
     }
+}
+
+pub fn empty_mesh() -> Mesh {
+    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
+    
+    let vertices: Vec<[f32; 3]> = Vec::new();
+    let normals: Vec<[f32; 3]> = Vec::new();
+    let voxel_indices: Vec<u32> = Vec::new();
+
+    let indices: Vec<u32> = Vec::new();
+    
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    mesh.insert_attribute(ATTRIBUTE_BASE_VOXEL_INDEX, voxel_indices);
+    mesh.insert_indices(Indices::U32(indices));
+    
+    mesh
 }
