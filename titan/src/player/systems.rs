@@ -1,4 +1,4 @@
-use bevy::{math::bounding::RayCast3d, prelude::*};
+use bevy::{prelude::*, window::CursorGrabMode};
 
 use crate::{
     chunk::{ChunkId, VoxelId, VoxelType},
@@ -51,13 +51,28 @@ pub fn setup(
 pub fn draw_cursor(
     mut commands: Commands,
     camera_query: Query<(&Camera, &GlobalTransform), With<Player>>,
-    windows: Query<&Window>,
+    mut windows: Query<&mut Window>,
     mut world: ResMut<crate::world::World>,
     mut text: Query<&mut Text, With<DebugMenu>>,
     mut gizmos: Gizmos,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
+    button_input: Res<ButtonInput<KeyCode>>,
     chunk_entities: Query<(Entity, &ChunkId)>,
 ) {
+    if button_input.just_pressed(KeyCode::Escape) {
+        let mut window = windows.single_mut();
+
+        window.cursor.visible = true;
+        window.cursor.grab_mode = CursorGrabMode::None;
+    }
+
+    if mouse_button_input.just_pressed(MouseButton::Left) {
+        let mut window = windows.single_mut();
+
+        window.cursor.visible = false;
+        window.cursor.grab_mode = CursorGrabMode::Locked;
+    }
+
     let (camera, camera_transform) = camera_query.single();
     let window = windows.single();
 
@@ -81,62 +96,75 @@ pub fn draw_cursor(
 
     // Calculate a ray pointing from the camera into the world from the center of the screen
     if let Some(ray) = camera.viewport_to_world(camera_transform, (w / 2., h / 2.).into()) {
-        let _ray_cast = RayCast3d::from_ray(ray, 200.0);
+        let mut prev_position: Option<Vec3> = None;
+        let mut block_position: Option<(Vec3, VoxelType)> = None;
 
-        //  for (hit_box, id) in chunks_query.iter()  {
+        for i in 0..20 {
+            let r = ray.get_point(i as f32);
 
-        //    if let Some(_) = ray_cast.aabb_intersection_at(&Aabb3d::new(hit_box.center.into(), hit_box.half_extents.into())) {
-        //        break;
-        //    }
-        // }
+            if let Some(b) = world.get_block(r) {
+                if b != VoxelType::Air {
+                    block_position = Some((r, b));
+                    break;
+                }
+            }
 
-        let r = ray.get_point(10.0);
-        text.single_mut().sections[3].value = format!(
-            "Selector Chunk: {}\n",
-            crate::world::World::get_id_for_position(r)
-        );
+            prev_position = Some(r);
+        }
 
-        if let Some(b) = world.get_block(r) {
-            if b != VoxelType::Air {
-                text.single_mut().sections[4].value = format!("Selector Block: {:?}\n", b);
+        if let Some((position, voxel_type)) = block_position {
+            let chunk_id = crate::world::World::get_id_for_position(position);
 
+            text.single_mut().sections[3].value = format!("Selector Chunk: {}\n", chunk_id);
+            text.single_mut().sections[4].value = format!("Selector Block: {:?}\n", voxel_type);
+
+            if let Some(p) = prev_position {
                 gizmos.primitive_3d(
-                    Cuboid {
-                        half_size: (0.5, 0.5, 0.5).into(),
-                    },
-                    Vec3::new(f32::floor(r.x), f32::floor(r.y), f32::floor(r.z))
-                        + Vec3::new(0.5, 0.5, 0.5),
+                    Sphere { radius: 0.5 },
+                    Vec3::new(f32::floor(p.x), f32::floor(p.y), f32::floor(p.z)),
                     Quat::from_rotation_x(0.0),
                     Color::GREEN,
                 );
+            }
 
-                if mouse_button_input.just_released(MouseButton::Left) {
-                    world.set_block(r, VoxelType::Solid { id: VoxelId::Stone });
+            gizmos.primitive_3d(
+                Sphere { radius: 0.5 },
+                Vec3::new(
+                    f32::floor(position.x),
+                    f32::floor(position.y),
+                    f32::floor(position.z),
+                ),
+                Quat::from_rotation_x(0.0),
+                Color::RED,
+            );
 
-                    // mark dirty
-                    let updated_id = crate::world::World::get_id_for_position(r);
-                    chunk_entities
-                        .iter()
-                        .filter(|(_entity, &id)| id == updated_id)
-                        .for_each(|(entity, _id)| {
-                            println!("marking {} as dirty!", updated_id);
-                            commands.entity(entity).try_insert(NeedsRemesh);
-                        });
-                }
+            if mouse_button_input.just_pressed(MouseButton::Left) {
+                let place_pos = match prev_position {
+                    Some(p) => p,
+                    None => position,
+                };
 
-                if mouse_button_input.just_released(MouseButton::Right) {
-                    world.set_block(r, VoxelType::Air);
+                world.set_block(place_pos, VoxelType::Solid { id: VoxelId::Stone });
 
-                     // mark dirty
-                    let updated_id = crate::world::World::get_id_for_position(r);
-                    chunk_entities
-                        .iter()
-                        .filter(|(_entity, &id)| id == updated_id)
-                        .for_each(|(entity, _id)| {
-                            println!("marking {} as dirty!", updated_id);
-                            commands.entity(entity).try_insert(NeedsRemesh);
-                        });
-                }
+                // mark dirty
+                chunk_entities
+                    .iter()
+                    .filter(|(_entity, &id)| id == chunk_id)
+                    .for_each(|(entity, _id)| {
+                        commands.entity(entity).try_insert(NeedsRemesh);
+                    });
+            }
+
+            if mouse_button_input.just_pressed(MouseButton::Right) {
+                world.set_block(position, VoxelType::Air);
+
+                // mark dirty
+                chunk_entities
+                    .iter()
+                    .filter(|(_entity, &id)| id == chunk_id)
+                    .for_each(|(entity, _id)| {
+                        commands.entity(entity).try_insert(NeedsRemesh);
+                    });
             }
         }
     };

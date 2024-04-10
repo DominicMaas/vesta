@@ -32,8 +32,8 @@ pub fn process_chunk_state_on_camera(
 
             // If this chunk doesn't exist, create it
             if !world.chunks.contains_key(&chunk_id) {
-                // Only 500 per frame
-                if queue.0.len() > 500 {
+                // Only 1000 per frame
+                if queue.0.len() > 1000 {
                     return;
                 }
 
